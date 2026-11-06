@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { PgBoss } from 'pg-boss';
 import { QUEUES, workerEnvSchema } from '@prospectnest/core';
-import { getDb } from '@prospectnest/db';
+import { evaluateCampaignBusiness, getDb } from '@prospectnest/db';
 import { startDispatcher, type ResearchJob } from './dispatcher';
 import { startHeartbeat } from './heartbeat';
 import { PURGE_SESSIONS_JOB, purgeExpiredSessions } from './jobs/maintenance';
@@ -30,7 +30,13 @@ async function main() {
   // One run at a time per worker; parallelism happens across businesses inside the run.
   await boss.work<ResearchJob>(QUEUES.research, { batchSize: 1 }, async ([job]) => {
     if (!job) return;
-    await processResearchRun(job.data.runId, { research, concurrency: env.WORKER_CONCURRENCY });
+    await processResearchRun(job.data.runId, {
+      research,
+      concurrency: env.WORKER_CONCURRENCY,
+      afterItem: async (campaignBusinessId) => {
+        await evaluateCampaignBusiness(getDb(), campaignBusinessId);
+      },
+    });
   });
 
   const stopDispatcher = startDispatcher(boss);

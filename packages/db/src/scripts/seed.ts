@@ -7,7 +7,8 @@ import path from 'node:path';
 import { config } from 'dotenv';
 import { defaultRuleSet, normalizeDomain, normalizeName } from '@prospectnest/core';
 import { getDb } from '../client';
-import type { ObservationStatus, Priority } from '../generated/prisma/client';
+import type { ObservationStatus } from '../generated/prisma/client';
+import { evaluateCampaignBusiness } from '../services/scoring';
 
 config({ path: path.resolve(import.meta.dirname, '../../../../.env'), quiet: true });
 
@@ -23,15 +24,6 @@ type DemoBusiness = {
   email?: string;
   phone?: string;
   signals: DemoSignal[];
-};
-
-// Mirrors the QR menu starter weights in the master plan (§9). Phase 4 replaces
-// this with the versioned rule engine; until then the seed computes the same numbers.
-const QR_BASE_SCORE = 50;
-const QR_IMPACT: Record<string, number> = {
-  pdf_or_image_menu: 15,
-  menu_by_phone_request: 10,
-  digital_menu_link: -35,
 };
 
 const businesses: DemoBusiness[] = [
@@ -98,7 +90,7 @@ const businesses: DemoBusiness[] = [
     district: 'Konak',
     category: 'Restoran',
     website: 'https://kordonpide.example',
-    signals: [{ signal: 'site_reachable', status: 'unknown', path: '/' }],
+    signals: [{ signal: 'website_present', status: 'unknown', path: '/' }],
   },
   {
     key: 'demo-006',
@@ -160,17 +152,6 @@ const businesses: DemoBusiness[] = [
   },
 ];
 
-function evaluate(signals: DemoSignal[]): { score: number; priority: Priority; coverage: number } {
-  const known = signals.filter((s) => s.status !== 'unknown');
-  if (known.length === 0) return { score: QR_BASE_SCORE, priority: 'not_evaluated', coverage: 0 };
-  const raw = known
-    .filter((s) => s.status === 'present')
-    .reduce((sum, s) => sum + (QR_IMPACT[s.signal] ?? 0), QR_BASE_SCORE);
-  const score = Math.max(0, Math.min(100, raw));
-  const priority: Priority = score >= 65 ? 'high' : score >= 45 ? 'medium' : 'low';
-  return { score, priority, coverage: known.length / Math.max(signals.length, 1) };
-}
-
 async function main() {
   const db = getDb();
   const now = new Date();
@@ -230,56 +211,24 @@ async function main() {
         });
       }
 
-      const evidenceIds: string[] = [];
       for (const signal of item.signals) {
-        const evidence = await tx.evidence.create({
+        await tx.evidence.create({
           data: {
             businessId: business.id,
             signal: signal.signal,
             observationStatus: signal.status,
-            sourceUrl: `${item.website ?? ''}${signal.path}`,
+            sourceUrl: `${item.website ?? 'kaynak-kaydi'}${signal.path}`,
             fetchedAt: now,
             excerpt: signal.excerpt ?? null,
           },
         });
-        evidenceIds.push(evidence.id);
       }
-
-      const result = item.signals.length > 0 ? evaluate(item.signals) : null;
       if (item.signals.some((s) => s.status === 'unknown')) failed += 1;
       else done += 1;
 
-      await tx.campaignBusiness.create({
-        data: {
-          campaignId: campaign.id,
-          businessId: business.id,
-          opportunityScore: result?.score ?? null,
-          evidenceCoverage: result?.coverage ?? null,
-          contactability: contacts.length,
-          priority: result?.priority ?? 'not_evaluated',
-          lastEvaluatedAt: result ? now : null,
-          ...(result
-            ? {
-                evaluations: {
-                  create: {
-                    ruleVersion: 1,
-                    score: result.score,
-                    evidenceCoverage: result.coverage,
-                    contactability: contacts.length,
-                    priority: result.priority,
-                    results: item.signals.map((s, index) => ({
-                      signal: s.signal,
-                      status: s.status,
-                      impact: s.status === 'present' ? (QR_IMPACT[s.signal] ?? 0) : 0,
-                      evidenceIds: evidenceIds.slice(index, index + 1),
-                    })),
-                    evidenceIds,
-                  },
-                },
-              }
-            : {}),
-        },
-      });
+      // Scores come from the same rule engine the worker uses.
+      const lead = await tx.campaignBusiness.create({ data: { campaignId: campaign.id, businessId: business.id } });
+      if (item.signals.length > 0) await evaluateCampaignBusiness(tx, lead.id);
     }
 
     await tx.run.create({

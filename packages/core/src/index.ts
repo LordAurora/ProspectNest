@@ -6,3 +6,4 @@ export * from './import';
 export * from './normalize';
 export * from './rules';
 export * from './time';
+export * from './scoring';
