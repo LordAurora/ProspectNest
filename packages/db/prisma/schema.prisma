@@ -151,6 +151,8 @@ model Campaign {
   ruleVersion         Int                @default(1)
   /// Validated rule DSL (packages/core). Never executable code.
   rules               Json?
+  /// csv | manual | discovery — discovery stays inactive until a provider is configured.
+  source              String             @default("csv")
   countries           String[]
   cities              String[]
   categories          String[]
@@ -184,6 +186,10 @@ model Business {
   longitude      Float?
   lastCheckedAt  DateTime?
   isDemo         Boolean            @default(false)
+  /// Set when a similar record (same name and city, no shared identifier) exists; awaits user review instead of being merged.
+  duplicateOfId  String?            @db.Uuid
+  duplicateOf    Business?          @relation("PossibleDuplicate", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates     Business[]         @relation("PossibleDuplicate")
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   sources        BusinessSource[]
@@ -312,6 +318,8 @@ model Run {
   /// Prevents two schedulers from creating the same slot twice.
   scheduledSlot     String?
   checkpoint        Json?
+  /// Import report: row-level errors and dedupe counters, never full source rows beyond a short excerpt.
+  summary           Json?
   totalItems        Int       @default(0)
   doneItems         Int       @default(0)
   failedItems       Int       @default(0)
