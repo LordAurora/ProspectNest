@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Activity } from 'lucide-react';
 import { runKindLabel, runStatusLabel } from '@prospectnest/core';
 import { db } from '@/lib/db';
@@ -60,7 +61,9 @@ export default async function RunsPage() {
               {runs.map((run) => (
                 <TR key={run.id}>
                   <TD className="max-w-[300px]">
-                    <p className="font-medium text-fg">{runKindLabel[run.kind]}</p>
+                    <Link href={`/runs/${run.id}`} className="font-medium text-fg hover:text-accent">
+                      {runKindLabel[run.kind]}
+                    </Link>
                     <p className="truncate text-[12px] text-fg-muted">{run.campaign.name}</p>
                   </TD>
                   <TD>

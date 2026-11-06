@@ -22,7 +22,19 @@ export const runStatusLabel: Record<RunStatus, string> = {
   cancelled: 'İptal edildi',
 };
 
-export const RUN_KINDS = ['import', 'research', 'discovery', 'recheck', 'sync'] as const;
+export const RUN_ITEM_STATUSES = ['pending', 'running', 'done', 'failed', 'skipped', 'blocked'] as const;
+export type RunItemStatus = (typeof RUN_ITEM_STATUSES)[number];
+
+export const runItemStatusLabel: Record<RunItemStatus, string> = {
+  pending: 'Bekliyor',
+  running: 'İnceleniyor',
+  done: 'Tamamlandı',
+  failed: 'Başarısız',
+  skipped: 'Atlandı',
+  blocked: 'Engellendi',
+};
+
+export const RUN_KINDS =['import', 'research', 'discovery', 'recheck', 'sync'] as const;
 export type RunKind = (typeof RUN_KINDS)[number];
 
 export const runKindLabel: Record<RunKind, string> = {

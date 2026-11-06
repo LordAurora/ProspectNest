@@ -21,6 +21,7 @@ import { runStatusTone } from '@/lib/status';
 import { Badge } from '@/components/ui/badge';
 import { buttonClass } from '@/components/ui/button';
 import { PageHeader, Panel, PanelHeader } from '@/components/ui/panel';
+import { StartResearchButton } from '@/components/run-actions';
 import { ManualBusinessForm } from './manual-business-form';
 
 export const dynamic = 'force-dynamic';
@@ -43,7 +44,7 @@ export default async function CampaignPage({ params }: Props) {
   const campaign = await loadCampaign((await params).id);
   if (!campaign || campaign.archivedAt) notFound();
 
-  const [byPriority, imports, total] = await Promise.all([
+  const [byPriority, imports, total, activeRun] = await Promise.all([
     db().campaignBusiness.groupBy({ by: ['priority'], where: { campaignId: campaign.id }, _count: true }),
     db().run.findMany({
       where: { campaignId: campaign.id, kind: 'import' },
@@ -52,6 +53,10 @@ export default async function CampaignPage({ params }: Props) {
       select: { id: true, status: true, newBusinesses: true, updatedBusinesses: true, failedItems: true, createdAt: true, summary: true },
     }),
     db().campaignBusiness.count({ where: { campaignId: campaign.id } }),
+    db().run.findFirst({
+      where: { campaignId: campaign.id, kind: { in: ['research', 'recheck', 'discovery'] }, status: { in: ['queued', 'running'] } },
+      select: { id: true },
+    }),
   ]);
 
   const ruleSet = ruleSetSchema.safeParse(campaign.rules);
@@ -73,10 +78,17 @@ export default async function CampaignPage({ params }: Props) {
             <Link href={`/businesses?campaign=${campaign.id}`} className={buttonClass()}>
               İşletmeleri gör
             </Link>
-            <Link href={`/campaigns/${campaign.id}/import`} className={buttonClass({ variant: 'primary' })}>
+            <Link href={`/campaigns/${campaign.id}/import`} className={buttonClass()}>
               <Upload aria-hidden />
               CSV içe aktar
             </Link>
+            {activeRun ? (
+              <Link href={`/runs/${activeRun.id}`} className={buttonClass({ variant: 'primary' })}>
+                Süren çalışmayı aç
+              </Link>
+            ) : (
+              <StartResearchButton campaignId={campaign.id} disabled={total === 0} />
+            )}
           </>
         }
       />
