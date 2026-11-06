@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import { LogOut } from 'lucide-react';
 import { requireUser } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { formatDateTime } from '@/lib/format';
+import { env } from '@/lib/env';
+import { formatDateTime, formatRelative } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { PageHeader, Panel, PanelHeader } from '@/components/ui/panel';
 import { logout } from '@/app/login/actions';
+import { AgentTokens } from './agent-tokens';
 
 export const metadata: Metadata = { title: 'Ayarlar' };
 export const dynamic = 'force-dynamic';
@@ -17,10 +19,11 @@ export default async function SettingsPage() {
     orderBy: { lastSeenAt: 'desc' },
     select: { id: true, userAgent: true, ip: true, lastSeenAt: true },
   });
+  const agents = await db().agentCredential.findMany({ orderBy: { createdAt: 'desc' }, take: 20 });
 
   return (
     <>
-      <PageHeader title="Ayarlar" description="Hesap ve oturum bilgileri." />
+      <PageHeader title="Ayarlar" description="Hesap, oturumlar ve yerel AI agent erişimi." />
       <div className="flex max-w-3xl flex-col gap-6">
         <Panel>
           <PanelHeader title="Hesap" />
@@ -33,6 +36,23 @@ export default async function SettingsPage() {
               tüm oturumları kapatır.
             </dd>
           </dl>
+        </Panel>
+
+        <Panel>
+          <PanelHeader
+            title="Yerel AI agent'ları"
+            description="Sunucu ile kendi bilgisayarınızdaki Ollama arasında köprü. Token yalnız AI işlerini alıp sonuç gönderebilir."
+          />
+          <AgentTokens
+            agentMode={env().AI_MODE === 'agent'}
+            agents={agents.map((a) => ({
+              id: a.id,
+              name: a.name,
+              prefix: a.prefix,
+              lastUsed: a.lastUsedAt ? formatRelative(a.lastUsedAt) : null,
+              revoked: a.revokedAt !== null,
+            }))}
+          />
         </Panel>
 
         <Panel>

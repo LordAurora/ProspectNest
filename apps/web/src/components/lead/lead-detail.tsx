@@ -77,7 +77,7 @@ function AiComment({
   analysis,
 }: {
   lead: LeadDetailData;
-  aiMode: 'disabled' | 'local';
+  aiMode: 'disabled' | 'local' | 'agent';
   analysis: LeadDetailData['analyses'][number] | undefined;
 }) {
   const muted = (text: string) => (

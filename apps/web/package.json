@@ -7,7 +7,8 @@
     "dev": "node scripts/next.mjs dev",
     "build": "node scripts/next.mjs build",
     "start": "node scripts/next.mjs start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@prospectnest/core": "workspace:*",
@@ -26,6 +27,7 @@
     "@tailwindcss/postcss": "4.3.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "tailwindcss": "4.3.5"
+    "tailwindcss": "4.3.5",
+    "vitest": "4.1.12"
   }
 }

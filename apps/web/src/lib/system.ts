@@ -3,6 +3,10 @@ import { cache } from 'react';
 import { WORKER_HEARTBEAT_STALE_MS } from '@prospectnest/core';
 import { db } from '@/lib/db';
 import { env } from '@/lib/env';
+import { formatRelative } from '@/lib/format';
+
+/** An agent polling at least every few minutes counts as connected. */
+const AGENT_ONLINE_MS = 10 * 60 * 1000;
 
 export type WorkerState =
   | { status: 'online'; lastBeatAt: Date; hostname: string }
@@ -45,6 +49,10 @@ export const getIntegrationSummaries = cache(async (): Promise<IntegrationSummar
       : sheetsRow?.status === 'error'
         ? 'error'
         : 'configured';
+  const lastAgent =
+    e.AI_MODE === 'agent'
+      ? await db().agentCredential.findFirst({ where: { revokedAt: null }, orderBy: { lastUsedAt: { sort: 'desc', nulls: 'last' } }, select: { lastUsedAt: true } })
+      : null;
   const ollamaEnabled = e.AI_MODE === 'local' && Boolean(e.OLLAMA_MODEL);
   const ollamaRow = ollamaEnabled ? await db().integration.findUnique({ where: { kind: 'ollama' } }) : null;
   const ollamaState: IntegrationSummary['state'] =
@@ -84,10 +92,14 @@ export const getIntegrationSummaries = cache(async (): Promise<IntegrationSummar
     {
       key: 'ollama',
       name: 'Yerel model (Ollama)',
-      state: ollamaState,
-      lastSuccessAt: ollamaRow?.lastSuccessAt ?? null,
+      state: e.AI_MODE === 'agent' ? (lastAgent?.lastUsedAt && Date.now() - lastAgent.lastUsedAt.getTime() < AGENT_ONLINE_MS ? 'healthy' : 'configured') : ollamaState,
+      lastSuccessAt: e.AI_MODE === 'agent' ? (lastAgent?.lastUsedAt ?? null) : (ollamaRow?.lastSuccessAt ?? null),
       detail:
-        e.AI_MODE === 'disabled'
+        e.AI_MODE === 'agent'
+          ? lastAgent?.lastUsedAt
+            ? `Hibrit mod: AI işlerini bilgisayarınızdaki agent alır. Son bağlantı ${formatRelative(lastAgent.lastUsedAt)}.`
+            : 'Hibrit mod: henüz bir agent bağlanmadı. Ayarlar sayfasından agent token oluşturun.'
+          : e.AI_MODE === 'disabled'
           ? 'Kapalı. Kural puanlaması ve aktarım modelden bağımsız çalışır.'
           : !e.OLLAMA_MODEL
             ? 'AI_MODE=local fakat OLLAMA_MODEL tanımlı değil.'

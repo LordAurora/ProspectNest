@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/api/health'];
+// /api/agent authenticates with its own scoped bearer token instead of the session cookie.
+const PUBLIC_PATHS = ['/login', '/api/health', '/api/agent'];
 const SESSION_COOKIES = ['__Host-pn_session', 'pn_session'];
 
 /**

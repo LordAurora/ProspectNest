@@ -58,6 +58,9 @@ async function main() {
         if (ollama) {
           await getDb().campaignBusiness.update({ where: { id: campaignBusinessId }, data: { aiStatus: 'pending' } });
           await boss.send(QUEUES.ai, { campaignBusinessId } satisfies AiJob, { singletonKey: campaignBusinessId, retryLimit: 1 });
+        } else if (env.AI_MODE === 'agent') {
+          // Hybrid mode: the user's local agent leases pending analyses over HTTPS.
+          await getDb().campaignBusiness.update({ where: { id: campaignBusinessId }, data: { aiStatus: 'pending' } });
         }
       },
     });

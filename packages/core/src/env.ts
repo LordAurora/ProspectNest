@@ -16,7 +16,7 @@ export const serverEnvSchema = z.object({
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET en az 32 karakter olmalı'),
   CREDENTIAL_ENCRYPTION_KEY: optionalString,
   DEMO_MODE: booleanFlag,
-  AI_MODE: z.enum(['disabled', 'local']).default('disabled'),
+  AI_MODE: z.enum(['disabled', 'local', 'agent']).default('disabled'),
   OLLAMA_BASE_URL: z.url().default('http://127.0.0.1:11434'),
   OLLAMA_MODEL: optionalString,
   GOOGLE_APPLICATION_CREDENTIALS: optionalString,

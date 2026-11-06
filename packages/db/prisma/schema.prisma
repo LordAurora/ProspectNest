@@ -442,3 +442,44 @@ model WorkerHeartbeat {
   startedAt  DateTime
   lastBeatAt DateTime
 }
+
+// ---------------------------------------------------------------------------
+// Hybrid mode: a local agent on the user's computer runs AI jobs
+// ---------------------------------------------------------------------------
+
+/// Scoped to AI lease/heartbeat/result only. Only an HMAC of the token is stored.
+model AgentCredential {
+  id         String        @id @default(uuid()) @db.Uuid
+  name       String
+  /// First characters of the token, shown in the UI to tell tokens apart.
+  prefix     String
+  tokenHash  String        @unique
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime      @default(now())
+  leases     AIJobLease[]
+}
+
+enum LeaseStatus {
+  leased
+  completed
+  expired
+  rejected
+}
+
+model AIJobLease {
+  id                 String          @id @default(uuid()) @db.Uuid
+  agentId            String          @db.Uuid
+  agent              AgentCredential @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  campaignBusinessId String          @db.Uuid
+  evidenceHash       String
+  promptVersion      String
+  leaseTokenHash     String
+  status             LeaseStatus     @default(leased)
+  expiresAt          DateTime
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([campaignBusinessId, status])
+  @@index([status, expiresAt])
+}
