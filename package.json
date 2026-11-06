@@ -1,0 +1,26 @@
+{
+  "name": "prospectnest",
+  "private": true,
+  "packageManager": "pnpm@10.34.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @prospectnest/web --filter @prospectnest/worker dev",
+    "dev:web": "pnpm --filter @prospectnest/web dev",
+    "dev:worker": "pnpm --filter @prospectnest/worker dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @prospectnest/db generate",
+    "db:migrate": "pnpm --filter @prospectnest/db migrate:deploy",
+    "db:migrate:dev": "pnpm --filter @prospectnest/db migrate:dev",
+    "db:seed": "pnpm --filter @prospectnest/db seed",
+    "admin:create": "pnpm --filter @prospectnest/db admin:create"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3"
+  }
+}

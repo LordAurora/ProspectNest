@@ -1,0 +1,420 @@
+// ProspectNest data model. PostgreSQL is the system of record; Google Sheets is
+// only an export target. All timestamps are stored in UTC.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums (values mirror packages/core/src/domain.ts)
+// ---------------------------------------------------------------------------
+
+enum RunStatus {
+  queued
+  running
+  partial
+  completed
+  failed
+  cancelled
+}
+
+enum RunKind {
+  import
+  research
+  discovery
+  recheck
+  sync
+}
+
+enum RunItemStatus {
+  pending
+  running
+  done
+  failed
+  skipped
+  blocked
+}
+
+enum Priority {
+  high
+  medium
+  low
+  not_evaluated
+}
+
+enum LeadStatus {
+  new
+  reviewing
+  contacted
+  qualified
+  rejected
+}
+
+enum ObservationStatus {
+  present
+  not_observed
+  unknown
+}
+
+enum ServiceTemplate {
+  qr_menu
+  website
+  appointment
+  reservation
+  ecommerce
+}
+
+enum ContactKind {
+  email
+  phone
+}
+
+enum ExportPolicy {
+  allowed
+  restricted
+  forbidden
+}
+
+enum AIStatus {
+  pending
+  running
+  completed
+  failed
+  skipped
+}
+
+enum IntegrationKind {
+  google_sheets
+  ollama
+  discovery
+}
+
+enum IntegrationStatus {
+  not_configured
+  configured
+  healthy
+  error
+}
+
+enum SyncStatus {
+  pending
+  in_progress
+  done
+  failed
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+}
+
+/// Only the SHA-256 of the session token is stored; the raw token lives in the cookie.
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  tokenHash  String   @unique
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Campaigns and businesses
+// ---------------------------------------------------------------------------
+
+model Campaign {
+  id                  String             @id @default(uuid()) @db.Uuid
+  name                String
+  serviceDescription  String
+  template            ServiceTemplate
+  ruleVersion         Int                @default(1)
+  /// Validated rule DSL (packages/core). Never executable code.
+  rules               Json?
+  countries           String[]
+  cities              String[]
+  categories          String[]
+  language            String             @default("tr")
+  timezone            String             @default("Europe/Istanbul")
+  dailyNewLimit       Int                @default(50)
+  dailyPageBudget     Int                @default(250)
+  discoveryCron       String?
+  recheckIntervalDays Int                @default(7)
+  archivedAt          DateTime?
+  isDemo              Boolean            @default(false)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  businesses          CampaignBusiness[]
+  runs                Run[]
+  sheetSync           SheetSync?
+}
+
+model Business {
+  id             String             @id @default(uuid()) @db.Uuid
+  name           String
+  normalizedName String
+  website        String?
+  domain         String?
+  country        String?
+  city           String?
+  district       String?
+  address        String?
+  category       String?
+  latitude       Float?
+  longitude      Float?
+  lastCheckedAt  DateTime?
+  isDemo         Boolean            @default(false)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  sources        BusinessSource[]
+  campaigns      CampaignBusiness[]
+  contacts       Contact[]
+  evidence       Evidence[]
+
+  // Chain branches share a domain, so the domain alone is not a dedupe key.
+  @@index([domain])
+  @@index([normalizedName, city])
+}
+
+model BusinessSource {
+  id           String       @id @default(uuid()) @db.Uuid
+  businessId   String       @db.Uuid
+  business     Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  provider     String
+  externalId   String
+  sourceUrl    String?
+  attribution  String?
+  exportPolicy ExportPolicy @default(allowed)
+  /// Per-field provenance, e.g. { "phone": "csv", "website": "manual" }.
+  fieldOrigins Json?
+  firstSeenAt  DateTime     @default(now())
+  lastSeenAt   DateTime     @default(now())
+
+  @@unique([provider, externalId])
+  @@index([businessId])
+}
+
+model CampaignBusiness {
+  id               String           @id @default(uuid()) @db.Uuid
+  campaignId       String           @db.Uuid
+  campaign         Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  businessId       String           @db.Uuid
+  business         Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  opportunityScore Int?
+  evidenceCoverage Float?
+  contactability   Int?
+  priority         Priority         @default(not_evaluated)
+  status           LeadStatus       @default(new)
+  aiStatus         AIStatus         @default(skipped)
+  notes            String?
+  firstSeenAt      DateTime         @default(now())
+  lastEvaluatedAt  DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  evaluations      RuleEvaluation[]
+  analyses         AIAnalysis[]
+  outbox           SyncOutbox[]
+
+  @@unique([campaignId, businessId])
+  @@index([campaignId, priority])
+}
+
+model Contact {
+  id         String      @id @default(uuid()) @db.Uuid
+  businessId String      @db.Uuid
+  business   Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  kind       ContactKind
+  value      String
+  sourceUrl  String?
+  seenAt     DateTime    @default(now())
+
+  @@unique([businessId, kind, value])
+}
+
+model Evidence {
+  id                String            @id @default(uuid()) @db.Uuid
+  businessId        String            @db.Uuid
+  business          Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  signal            String
+  observationStatus ObservationStatus
+  sourceUrl         String
+  fetchedAt         DateTime
+  excerpt           String?
+  contentHash       String?
+  exportPolicy      ExportPolicy      @default(allowed)
+  createdAt         DateTime          @default(now())
+
+  @@index([businessId, signal])
+}
+
+model RuleEvaluation {
+  id                 String           @id @default(uuid()) @db.Uuid
+  campaignBusinessId String           @db.Uuid
+  campaignBusiness   CampaignBusiness @relation(fields: [campaignBusinessId], references: [id], onDelete: Cascade)
+  ruleVersion        Int
+  score              Int
+  evidenceCoverage   Float
+  contactability     Int
+  priority           Priority
+  /// Per-rule outcome: [{ ruleId, signal, status, impact, evidenceIds }]
+  results            Json
+  evidenceIds        String[]
+  createdAt          DateTime         @default(now())
+
+  @@index([campaignBusinessId, createdAt])
+}
+
+model AIAnalysis {
+  id                 String           @id @default(uuid()) @db.Uuid
+  campaignBusinessId String           @db.Uuid
+  campaignBusiness   CampaignBusiness @relation(fields: [campaignBusinessId], references: [id], onDelete: Cascade)
+  model              String
+  promptVersion      String
+  evidenceHash       String
+  status             AIStatus
+  output             Json?
+  error              String?
+  createdAt          DateTime         @default(now())
+
+  @@unique([campaignBusinessId, evidenceHash, promptVersion])
+}
+
+// ---------------------------------------------------------------------------
+// Runs
+// ---------------------------------------------------------------------------
+
+model Run {
+  id                String    @id @default(uuid()) @db.Uuid
+  campaignId        String    @db.Uuid
+  campaign          Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  kind              RunKind
+  status            RunStatus @default(queued)
+  /// Prevents two schedulers from creating the same slot twice.
+  scheduledSlot     String?
+  checkpoint        Json?
+  totalItems        Int       @default(0)
+  doneItems         Int       @default(0)
+  failedItems       Int       @default(0)
+  newBusinesses     Int       @default(0)
+  updatedBusinesses Int       @default(0)
+  error             String?
+  cancelRequested   Boolean   @default(false)
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  items             RunItem[]
+
+  @@unique([campaignId, scheduledSlot])
+  @@index([status])
+  @@index([campaignId, createdAt])
+}
+
+model RunItem {
+  id         String        @id @default(uuid()) @db.Uuid
+  runId      String        @db.Uuid
+  run        Run           @relation(fields: [runId], references: [id], onDelete: Cascade)
+  businessId String?       @db.Uuid
+  status     RunItemStatus @default(pending)
+  attempts   Int           @default(0)
+  errorKind  String?
+  error      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@unique([runId, businessId])
+  @@index([runId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Integrations and sync
+// ---------------------------------------------------------------------------
+
+/// Secrets are never stored here in clear text: only references or encrypted blobs.
+model Integration {
+  id            String            @id @default(uuid()) @db.Uuid
+  kind          IntegrationKind   @unique
+  status        IntegrationStatus @default(not_configured)
+  config        Json?
+  credentialRef String?
+  lastCheckedAt DateTime?
+  lastSuccessAt DateTime?
+  lastError     String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model SheetSync {
+  id            String    @id @default(uuid()) @db.Uuid
+  campaignId    String    @unique @db.Uuid
+  campaign      Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  spreadsheetId String
+  sheetTabId    Int?
+  sheetTitle    String
+  lastSyncedAt  DateTime?
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model SyncOutbox {
+  id                 String           @id @default(uuid()) @db.Uuid
+  campaignBusinessId String           @db.Uuid
+  campaignBusiness   CampaignBusiness @relation(fields: [campaignBusinessId], references: [id], onDelete: Cascade)
+  revision           Int
+  checksum           String
+  status             SyncStatus       @default(pending)
+  attempts           Int              @default(0)
+  lastError          String?
+  createdAt          DateTime         @default(now())
+  processedAt        DateTime?
+
+  @@unique([campaignBusinessId, revision])
+  @@index([status, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Operations
+// ---------------------------------------------------------------------------
+
+/// Never log secrets or full page bodies here.
+model AuditEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  action    String
+  actorId   String?  @db.Uuid
+  subject   String?
+  ip        String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([ip, action, createdAt])
+}
+
+model WorkerHeartbeat {
+  workerId   String   @id
+  hostname   String
+  version    String
+  startedAt  DateTime
+  lastBeatAt DateTime
+}
