@@ -148,3 +148,22 @@ export async function importCsv(campaignId: string, input: z.input<typeof import
   revalidatePath('/businesses');
   return { ok: true, ...result };
 }
+
+export type ScheduleState = { error?: string; message?: string };
+
+export async function updateSchedule(campaignId: string, _: ScheduleState, formData: FormData): Promise<ScheduleState> {
+  const user = await requireUser();
+  const campaign = await requireCampaign(campaignId);
+  const parsed = z
+    .object({ scheduleEnabled: z.literal('on').optional(), recheckHour: z.coerce.number().int().min(0).max(23) })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: 'Geçersiz saat.' };
+
+  await db().campaign.update({
+    where: { id: campaign.id },
+    data: { scheduleEnabled: parsed.data.scheduleEnabled === 'on', recheckHour: parsed.data.recheckHour },
+  });
+  await db().auditEvent.create({ data: { action: 'campaign.schedule_updated', actorId: user.id, subject: campaign.id, metadata: parsed.data } });
+  revalidatePath(`/campaigns/${campaign.id}`);
+  return { message: parsed.data.scheduleEnabled === 'on' ? 'Program açıldı.' : 'Program kapatıldı.' };
+}

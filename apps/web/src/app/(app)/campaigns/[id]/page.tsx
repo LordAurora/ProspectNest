@@ -11,6 +11,7 @@ import {
   serviceTemplateLabel,
   signalLabel,
   PRIORITIES,
+  nextRecheckWindow,
 } from '@prospectnest/core';
 import { resolveDiscoveryProvider } from '@prospectnest/providers';
 import { db } from '@/lib/db';
@@ -24,6 +25,7 @@ import { PageHeader, Panel, PanelHeader } from '@/components/ui/panel';
 import { SheetSyncButton } from '@/components/integration-actions';
 import { StartResearchButton } from '@/components/run-actions';
 import { ManualBusinessForm } from './manual-business-form';
+import { ScheduleForm } from './schedule-form';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +65,7 @@ export default async function CampaignPage({ params }: Props) {
 
   const ruleSet = ruleSetSchema.safeParse(campaign.rules);
   const discovery = resolveDiscoveryProvider(env().DISCOVERY_PROVIDER);
+  const nextWindow = campaign.isDemo ? null : nextRecheckWindow(campaign, new Date());
   const sheetsConfigured = Boolean(env().GOOGLE_APPLICATION_CREDENTIALS && env().GOOGLE_SPREADSHEET_ID);
   const counts = Object.fromEntries(byPriority.map((row) => [row.priority, row._count]));
 
@@ -192,7 +195,16 @@ export default async function CampaignPage({ params }: Props) {
               <dd>{campaign.recheckIntervalDays} günde bir</dd>
               <dt className="text-fg-muted">Saat dilimi</dt>
               <dd>{campaign.timezone}</dd>
+              <dt className="text-fg-muted">Sonraki kontrol</dt>
+              <dd>{nextWindow ? formatDateTime(nextWindow) : 'Program kapalı'}</dd>
             </dl>
+            {campaign.isDemo ? (
+              <p className="border-t border-border px-4 py-3 text-[12px] text-fg-muted">Demo kampanyalarında otomatik program çalışmaz.</p>
+            ) : (
+              <div className="border-t border-border">
+                <ScheduleForm campaignId={campaign.id} enabled={campaign.scheduleEnabled} recheckHour={campaign.recheckHour} timezone={campaign.timezone} />
+              </div>
+            )}
           </Panel>
 
           <Panel>

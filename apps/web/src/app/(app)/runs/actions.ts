@@ -68,7 +68,7 @@ export async function retryRun(runId: string, _: RunActionState): Promise<RunAct
   const id = z.uuid().parse(runId);
   const run = await db().run.findUnique({ where: { id }, select: { campaignId: true, status: true, kind: true } });
   if (!run) return { error: 'Çalışma bulunamadı.' };
-  if (run.kind !== 'research') return { error: 'Bu tür çalışma yeniden denenemez.' };
+  if (run.kind !== 'research' && run.kind !== 'recheck') return { error: 'Bu tür çalışma yeniden denenemez.' };
 
   const items = await db().runItem.findMany({
     where: { runId: id, status: { in: ['failed', 'pending', 'running'] }, businessId: { not: null } },

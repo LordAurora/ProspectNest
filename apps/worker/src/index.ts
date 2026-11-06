@@ -8,6 +8,7 @@ import { startHeartbeat } from './heartbeat';
 import { processAnalysis, type AiJob } from './jobs/ai';
 import { PURGE_SESSIONS_JOB, purgeExpiredSessions } from './jobs/maintenance';
 import { processResearchRun } from './jobs/research';
+import { planScheduledRuns, SCHEDULER_JOB } from './jobs/scheduler';
 import { processSyncRun } from './jobs/sheets';
 import { logger } from './logger';
 import { createResearcher } from './researcher';
@@ -39,8 +40,10 @@ async function main() {
 
   // Maintenance jobs share one queue; the job name travels in the payload.
   await boss.schedule(QUEUES.maintenance, '17 * * * *', { job: PURGE_SESSIONS_JOB }, { key: PURGE_SESSIONS_JOB });
+  await boss.schedule(QUEUES.maintenance, '* * * * *', { job: SCHEDULER_JOB }, { key: SCHEDULER_JOB });
   await boss.work<{ job: string }>(QUEUES.maintenance, async ([job]) => {
     if (job?.data.job === PURGE_SESSIONS_JOB) await purgeExpiredSessions();
+    if (job?.data.job === SCHEDULER_JOB) await planScheduledRuns();
   });
 
   const research = createResearcher({ demoMode: env.DEMO_MODE });

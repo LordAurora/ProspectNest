@@ -65,7 +65,7 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
   const remaining = Math.max(0, run.totalItems - run.doneItems - run.failedItems);
   const percent = run.totalItems > 0 ? Math.round(((run.doneItems + run.failedItems) / run.totalItems) * 100) : 0;
   const summary = (run.summary ?? null) as ImportSummary | null;
-  const canRetry = run.kind === 'research' && (run.status === 'partial' || run.status === 'failed');
+  const canRetry = (run.kind === 'research' || run.kind === 'recheck') && (run.status === 'partial' || run.status === 'failed');
 
   return (
     <>

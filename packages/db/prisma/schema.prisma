@@ -162,6 +162,10 @@ model Campaign {
   dailyPageBudget     Int                @default(250)
   discoveryCron       String?
   recheckIntervalDays Int                @default(7)
+  /// Daily automatic recheck of businesses whose evidence is older than recheckIntervalDays.
+  scheduleEnabled     Boolean            @default(false)
+  /// Local hour (campaign timezone) after which the daily recheck may start.
+  recheckHour         Int                @default(3)
   archivedAt          DateTime?
   isDemo              Boolean            @default(false)
   createdAt           DateTime           @default(now())
