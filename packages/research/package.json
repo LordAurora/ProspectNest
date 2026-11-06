@@ -1,0 +1,23 @@
+{
+  "name": "@prospectnest/research",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@prospectnest/core": "workspace:*",
+    "cheerio": "1.2.0",
+    "undici": "8.12.4",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "vitest": "4.1.12",
+    "@prospectnest/test-fixtures": "workspace:*"
+  }
+}
