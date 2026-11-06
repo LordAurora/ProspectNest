@@ -88,3 +88,13 @@ describe('escapeSpreadsheetCell', () => {
     expect(escapeSpreadsheetCell('Kafe')).toBe('Kafe');
   });
 });
+
+describe('time zones', () => {
+  it('finds local midnight in Istanbul (UTC+3)', async () => {
+    const { startOfDayInTimeZone, localDateKey } = await import('./time');
+    const at = new Date('2026-11-07T01:30:00Z'); // 04:30 in Istanbul
+    expect(startOfDayInTimeZone(at, 'Europe/Istanbul').toISOString()).toBe('2026-11-06T21:00:00.000Z');
+    expect(localDateKey(at, 'Europe/Istanbul')).toBe('2026-11-07');
+    expect(localDateKey(at, 'America/New_York')).toBe('2026-11-06');
+  });
+});

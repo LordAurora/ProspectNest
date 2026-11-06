@@ -6,13 +6,19 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
     "start": "tsx src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@prospectnest/core": "workspace:*",
     "@prospectnest/db": "workspace:*",
+    "@prospectnest/research": "workspace:*",
+    "@prospectnest/test-fixtures": "workspace:*",
     "pg-boss": "12.38.1",
     "tsx": "4.23.15",
     "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "vitest": "4.1.12"
   }
 }

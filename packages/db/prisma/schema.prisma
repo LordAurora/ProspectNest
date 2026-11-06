@@ -318,6 +318,10 @@ model Run {
   /// Prevents two schedulers from creating the same slot twice.
   scheduledSlot     String?
   checkpoint        Json?
+  /// Run parameters, e.g. { businessIds } for a retry limited to failed items.
+  options           Json?
+  /// Set when the worker hands the run to the job queue; null means not yet dispatched.
+  dispatchedAt      DateTime?
   /// Import report: row-level errors and dedupe counters, never full source rows beyond a short excerpt.
   summary           Json?
   totalItems        Int       @default(0)
@@ -334,7 +338,7 @@ model Run {
   items             RunItem[]
 
   @@unique([campaignId, scheduledSlot])
-  @@index([status])
+  @@index([status, dispatchedAt])
   @@index([campaignId, createdAt])
 }
 
@@ -345,6 +349,8 @@ model RunItem {
   businessId String?       @db.Uuid
   status     RunItemStatus @default(pending)
   attempts   Int           @default(0)
+  /// Counts toward the campaign daily page budget.
+  pagesFetched Int         @default(0)
   errorKind  String?
   error      String?
   createdAt  DateTime      @default(now())
@@ -352,6 +358,7 @@ model RunItem {
 
   @@unique([runId, businessId])
   @@index([runId, status])
+  @@index([updatedAt])
 }
 
 // ---------------------------------------------------------------------------

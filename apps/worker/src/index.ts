@@ -2,9 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { PgBoss } from 'pg-boss';
 import { QUEUES, workerEnvSchema } from '@prospectnest/core';
 import { getDb } from '@prospectnest/db';
+import { startDispatcher, type ResearchJob } from './dispatcher';
 import { startHeartbeat } from './heartbeat';
 import { PURGE_SESSIONS_JOB, purgeExpiredSessions } from './jobs/maintenance';
+import { processResearchRun } from './jobs/research';
 import { logger } from './logger';
+import { createResearcher } from './researcher';
 
 async function main() {
   const env = workerEnvSchema.parse(process.env);
@@ -23,18 +26,30 @@ async function main() {
     if (job?.data.job === PURGE_SESSIONS_JOB) await purgeExpiredSessions();
   });
 
-  // Research handlers arrive in phase 3; the queue already exists so the web
-  // app can enqueue runs and they wait durably instead of failing.
+  const research = createResearcher({ demoMode: env.DEMO_MODE });
+  // One run at a time per worker; parallelism happens across businesses inside the run.
+  await boss.work<ResearchJob>(QUEUES.research, { batchSize: 1 }, async ([job]) => {
+    if (!job) return;
+    await processResearchRun(job.data.runId, { research, concurrency: env.WORKER_CONCURRENCY });
+  });
 
+  const stopDispatcher = startDispatcher(boss);
   const stopHeartbeat = startHeartbeat(workerId);
-  logger.info('worker başladı', { workerId, concurrency: env.WORKER_CONCURRENCY, aiMode: env.AI_MODE });
+  logger.info('worker başladı', {
+    workerId,
+    concurrency: env.WORKER_CONCURRENCY,
+    aiMode: env.AI_MODE,
+    demoMode: env.DEMO_MODE,
+  });
 
   let stopping = false;
   const shutdown = async (signal: string) => {
     if (stopping) return;
     stopping = true;
     logger.info('worker kapanıyor', { signal });
+    stopDispatcher();
     stopHeartbeat();
+    // Unfinished runs resume from their items when pg-boss retries the job.
     await boss.stop({ graceful: true, timeout: 20_000 });
     await getDb().$disconnect();
     process.exit(0);
