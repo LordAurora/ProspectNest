@@ -43,3 +43,11 @@ export function getServerEnv(source: NodeJS.ProcessEnv = process.env): ServerEnv
   if (source === process.env) cached = result.data;
   return result.data;
 }
+
+export const workerEnvSchema = serverEnvSchema.pick({
+  DATABASE_URL: true,
+  WORKER_CONCURRENCY: true,
+  AI_MODE: true,
+});
+
+export type WorkerEnv = z.infer<typeof workerEnvSchema>;
