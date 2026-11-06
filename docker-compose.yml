@@ -1,0 +1,68 @@
+# Local full stack: Postgres + migrations + web + worker.
+# Ollama is intentionally not part of this file; see README for the optional setup.
+#
+#   cp .env.example .env    # fill SESSION_SECRET and POSTGRES_PASSWORD
+#   docker compose up -d --build
+#   docker compose run --rm migrate pnpm admin:create --email you@example.com
+
+name: prospectnest
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://prospectnest:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/prospectnest
+  APP_URL: ${APP_URL:-http://localhost:3000}
+  SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+  CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-}
+  DEMO_MODE: ${DEMO_MODE:-false}
+  AI_MODE: ${AI_MODE:-disabled}
+  # Inside a container "localhost" is the container itself, not your computer.
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+  OLLAMA_MODEL: ${OLLAMA_MODEL:-}
+  DISCOVERY_PROVIDER: ${DISCOVERY_PROVIDER:-none}
+  WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: prospectnest
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: prospectnest
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - '127.0.0.1:5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U prospectnest -d prospectnest']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: { context: ., target: worker }
+    environment: *app-env
+    command: ['pnpm', 'db:migrate']
+    depends_on:
+      db: { condition: service_healthy }
+    restart: 'no'
+
+  web:
+    build: { context: ., target: web }
+    restart: unless-stopped
+    environment: *app-env
+    ports:
+      - '127.0.0.1:3000:3000'
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    build: { context: ., target: worker }
+    restart: unless-stopped
+    environment: *app-env
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+volumes:
+  pgdata:

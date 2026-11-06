@@ -1,13 +1,14 @@
 /**
  * Creates or resets the single administrator account.
  *
- *   pnpm admin:create -- --email you@example.com
+ *   pnpm admin:create --email you@example.com
  *
  * The password is read from ADMIN_PASSWORD or prompted on the terminal so it
  * never ends up in shell history.
  */
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { Writable } from 'node:stream';
 import { parseArgs } from 'node:util';
 import { config } from 'dotenv';
 import { z } from 'zod';
@@ -16,17 +17,29 @@ import { MIN_PASSWORD_LENGTH, hashPassword } from '../password';
 
 config({ path: path.resolve(import.meta.dirname, '../../../../.env'), quiet: true });
 
+/** Reads a password without echoing it back to the terminal. */
 async function promptPassword(): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  const prompt = 'Parola: ';
+  const output = new Writable({
+    write(chunk: Buffer, _encoding, callback) {
+      // Let the prompt itself through, swallow everything typed after it.
+      if (chunk.toString() === prompt) process.stdout.write(chunk);
+      callback();
+    },
+  });
+  const rl = createInterface({ input: process.stdin, output, terminal: true });
   try {
-    return await rl.question('Parola: ');
+    return await rl.question(prompt);
   } finally {
     rl.close();
+    process.stdout.write('\n');
   }
 }
 
 async function main() {
   const { values } = parseArgs({
+    // pnpm forwards a literal "--" separator when users type one.
+    args: process.argv.slice(2).filter((arg) => arg !== '--'),
     options: { email: { type: 'string' }, name: { type: 'string' } },
   });
   const email = z.email('Geçerli bir e-posta girin').parse(values.email ?? process.env.ADMIN_EMAIL);
