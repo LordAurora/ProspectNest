@@ -45,6 +45,19 @@ export const getIntegrationSummaries = cache(async (): Promise<IntegrationSummar
       : sheetsRow?.status === 'error'
         ? 'error'
         : 'configured';
+  const ollamaEnabled = e.AI_MODE === 'local' && Boolean(e.OLLAMA_MODEL);
+  const ollamaRow = ollamaEnabled ? await db().integration.findUnique({ where: { kind: 'ollama' } }) : null;
+  const ollamaState: IntegrationSummary['state'] =
+    e.AI_MODE === 'disabled'
+      ? 'disabled'
+      : !e.OLLAMA_MODEL
+        ? 'not_configured'
+        : ollamaRow?.status === 'healthy'
+          ? 'healthy'
+          : ollamaRow?.status === 'error'
+            ? 'error'
+            : 'configured';
+
   return [
     {
       key: 'sheets',
@@ -71,13 +84,18 @@ export const getIntegrationSummaries = cache(async (): Promise<IntegrationSummar
     {
       key: 'ollama',
       name: 'Yerel model (Ollama)',
-      state: e.AI_MODE === 'disabled' ? 'disabled' : e.OLLAMA_MODEL ? 'configured' : 'not_configured',
+      state: ollamaState,
+      lastSuccessAt: ollamaRow?.lastSuccessAt ?? null,
       detail:
         e.AI_MODE === 'disabled'
           ? 'Kapalı. Kural puanlaması ve aktarım modelden bağımsız çalışır.'
-          : e.OLLAMA_MODEL
-            ? `Model: ${e.OLLAMA_MODEL}. Sağlık kontrolü henüz yapılmadı.`
-            : 'AI_MODE=local fakat OLLAMA_MODEL tanımlı değil.',
+          : !e.OLLAMA_MODEL
+            ? 'AI_MODE=local fakat OLLAMA_MODEL tanımlı değil.'
+            : ollamaState === 'healthy'
+              ? `Model hazır: ${e.OLLAMA_MODEL}.`
+              : ollamaState === 'error'
+                ? (ollamaRow?.lastError ?? 'Son kontrol başarısız oldu.')
+                : `Model: ${e.OLLAMA_MODEL}. Sağlık kontrolü henüz yapılmadı.`,
     },
   ];
 });

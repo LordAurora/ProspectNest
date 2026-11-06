@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { CircleAlert, CircleCheck, FileSpreadsheet, PlugZap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { startSheetSync, testSheetsConnection, type IntegrationActionState } from '@/app/(app)/integrations/actions';
+import { startSheetSync, testOllama, testSheetsConnection, type IntegrationActionState } from '@/app/(app)/integrations/actions';
 
 function Feedback({ state }: { state: IntegrationActionState }) {
   if (state.error) {
@@ -45,6 +45,19 @@ export function SheetSyncButton({ campaignId }: { campaignId: string }) {
       <Button type="submit" size="sm" loading={pending}>
         <FileSpreadsheet aria-hidden />
         Sheets&apos;e aktar
+      </Button>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+export function TestOllamaButton() {
+  const [state, action, pending] = useActionState(testOllama, {});
+  return (
+    <form action={action} className="flex flex-col items-start gap-1.5 sm:items-end">
+      <Button type="submit" size="sm" loading={pending}>
+        <PlugZap aria-hidden />
+        Modeli kontrol et
       </Button>
       <Feedback state={state} />
     </form>

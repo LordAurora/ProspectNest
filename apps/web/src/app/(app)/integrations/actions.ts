@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { createGoogleSheetsApi, SheetsError, tabTitleFor } from '@prospectnest/integrations';
+import { createGoogleSheetsApi, OllamaClient, SheetsError, tabTitleFor } from '@prospectnest/integrations';
 import { requireUser } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { env } from '@/lib/env';
@@ -60,4 +60,28 @@ export async function startSheetSync(campaignId: string, _: IntegrationActionSta
   const run = await db().run.create({ data: { campaignId: id, kind: 'sync', status: 'queued', options: { full: true } } });
   await db().auditEvent.create({ data: { action: 'sync.queued', actorId: user.id, subject: run.id } });
   redirect(`/runs/${run.id}`);
+}
+
+/** Asks the local Ollama server which models are installed. Never pulls a model. */
+export async function testOllama(_: IntegrationActionState): Promise<IntegrationActionState> {
+  await requireUser();
+  const { AI_MODE, OLLAMA_BASE_URL, OLLAMA_MODEL } = env();
+  if (AI_MODE !== 'local' || !OLLAMA_MODEL) return { error: 'AI_MODE=local ve OLLAMA_MODEL tanımlanmalı.' };
+
+  const health = await new OllamaClient({ baseUrl: OLLAMA_BASE_URL, model: OLLAMA_MODEL, timeoutMs: 5_000 }).health();
+  const now = new Date();
+  const ok = health.status === 'ready';
+  const message =
+    health.status === 'ready'
+      ? `Model hazır: ${health.model}`
+      : health.status === 'model_missing'
+        ? `"${health.model}" yüklü değil. Bilgisayarınızda "ollama pull ${health.model}" ile kurabilirsiniz; uygulama otomatik indirmez.`
+        : `Yerel model sunucusuna ulaşılamadı (${health.reason}).`;
+  await db().integration.upsert({
+    where: { kind: 'ollama' },
+    create: { kind: 'ollama', status: ok ? 'healthy' : 'error', lastCheckedAt: now, lastSuccessAt: ok ? now : null, lastError: ok ? null : message },
+    update: { status: ok ? 'healthy' : 'error', lastCheckedAt: now, ...(ok ? { lastSuccessAt: now, lastError: null } : { lastError: message }) },
+  });
+  revalidatePath('/integrations');
+  return ok ? { message } : { error: message };
 }

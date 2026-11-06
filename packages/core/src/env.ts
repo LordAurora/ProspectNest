@@ -50,6 +50,8 @@ export const workerEnvSchema = serverEnvSchema.pick({
   AI_MODE: true,
   DEMO_MODE: true,
   GOOGLE_APPLICATION_CREDENTIALS: true,
+  OLLAMA_BASE_URL: true,
+  OLLAMA_MODEL: true,
 });
 
 export type WorkerEnv = z.infer<typeof workerEnvSchema>;

@@ -2,14 +2,15 @@ import { randomUUID } from 'node:crypto';
 import { PgBoss } from 'pg-boss';
 import { QUEUES, workerEnvSchema } from '@prospectnest/core';
 import { evaluateCampaignBusiness, getDb } from '@prospectnest/db';
+import { createGoogleSheetsApi, OllamaClient } from '@prospectnest/integrations';
 import { startDispatcher, type ResearchJob } from './dispatcher';
 import { startHeartbeat } from './heartbeat';
+import { processAnalysis, type AiJob } from './jobs/ai';
 import { PURGE_SESSIONS_JOB, purgeExpiredSessions } from './jobs/maintenance';
 import { processResearchRun } from './jobs/research';
 import { processSyncRun } from './jobs/sheets';
 import { logger } from './logger';
 import { createResearcher } from './researcher';
-import { createGoogleSheetsApi } from '@prospectnest/integrations';
 
 async function main() {
   const env = workerEnvSchema.parse(process.env);
@@ -22,6 +23,19 @@ async function main() {
   await boss.createQueue(QUEUES.maintenance);
   await boss.createQueue(QUEUES.research);
   await boss.createQueue(QUEUES.sync);
+  await boss.createQueue(QUEUES.ai);
+
+  // Local AI is optional: with AI_MODE=disabled no analysis is queued and the
+  // rest of the pipeline is unaffected. One analysis at a time keeps CPU-only machines usable.
+  const ollama =
+    env.AI_MODE === 'local' && env.OLLAMA_MODEL
+      ? new OllamaClient({ baseUrl: env.OLLAMA_BASE_URL, model: env.OLLAMA_MODEL, timeoutMs: 120_000 })
+      : null;
+  if (ollama) {
+    await boss.work<AiJob>(QUEUES.ai, { batchSize: 1 }, async ([job]) => {
+      if (job) await processAnalysis(job.data.campaignBusinessId, ollama);
+    });
+  }
 
   // Maintenance jobs share one queue; the job name travels in the payload.
   await boss.schedule(QUEUES.maintenance, '17 * * * *', { job: PURGE_SESSIONS_JOB }, { key: PURGE_SESSIONS_JOB });
@@ -38,6 +52,10 @@ async function main() {
       concurrency: env.WORKER_CONCURRENCY,
       afterItem: async (campaignBusinessId) => {
         await evaluateCampaignBusiness(getDb(), campaignBusinessId);
+        if (ollama) {
+          await getDb().campaignBusiness.update({ where: { id: campaignBusinessId }, data: { aiStatus: 'pending' } });
+          await boss.send(QUEUES.ai, { campaignBusinessId } satisfies AiJob, { singletonKey: campaignBusinessId, retryLimit: 1 });
+        }
       },
     });
   });

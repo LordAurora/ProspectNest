@@ -3,7 +3,7 @@ import { Bot, Cpu, FileSpreadsheet, Radar, type LucideIcon } from 'lucide-react'
 import { readServiceAccountEmail } from '@prospectnest/integrations';
 import { env } from '@/lib/env';
 import { formatRelative } from '@/lib/format';
-import { TestSheetsButton } from '@/components/integration-actions';
+import { TestOllamaButton, TestSheetsButton } from '@/components/integration-actions';
 import { getIntegrationSummaries, getWorkerState, type IntegrationSummary } from '@/lib/system';
 import { Badge, type Tone } from '@/components/ui/badge';
 import { PageHeader, Panel } from '@/components/ui/panel';
@@ -115,7 +115,13 @@ export default async function IntegrationsPage() {
                     </details>
                   ) : null
                 }
-                action={integration.key === 'sheets' && integration.state !== 'not_configured' ? <TestSheetsButton /> : null}
+                action={
+                  integration.key === 'sheets' && integration.state !== 'not_configured' ? (
+                    <TestSheetsButton />
+                  ) : integration.key === 'ollama' && integration.state !== 'disabled' && integration.state !== 'not_configured' ? (
+                    <TestOllamaButton />
+                  ) : null
+                }
               />
             ))}
           </ul>

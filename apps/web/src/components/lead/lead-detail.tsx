@@ -10,6 +10,7 @@ import {
   type RuleResult,
   type Signal,
 } from '@prospectnest/core';
+import { localAnalysisSchema, type LocalAnalysis } from '@prospectnest/integrations';
 import { cn } from '@/lib/cn';
 import { env } from '@/lib/env';
 import { formatDateTime, formatRelative } from '@/lib/format';
@@ -62,6 +63,65 @@ function ruleSentence(result: RuleResult): string {
   const label = signalLabel[result.signal];
   if (result.status === 'unknown') return `${label}: değerlendirilemedi`;
   return `${label} ${ruleConditionLabel[result.when]}`;
+}
+
+const assessmentBadge: Record<LocalAnalysis['assessment'], { tone: Tone; label: string }> = {
+  potential_fit: { tone: 'accent', label: 'Uygun olabilir' },
+  low_priority: { tone: 'neutral', label: 'Düşük öncelik' },
+  insufficient_evidence: { tone: 'warning', label: 'Yetersiz kanıt' },
+};
+
+function AiComment({
+  lead,
+  aiMode,
+  analysis,
+}: {
+  lead: LeadDetailData;
+  aiMode: 'disabled' | 'local';
+  analysis: LeadDetailData['analyses'][number] | undefined;
+}) {
+  const muted = (text: string) => (
+    <p className="flex items-center gap-2 text-[13px] text-fg-muted">
+      <Bot className="size-4 shrink-0 text-fg-subtle" aria-hidden />
+      {text}
+    </p>
+  );
+  if (!analysis) {
+    return muted(aiMode === 'disabled' ? 'Yerel model kapalı. Kural değerlendirmesi modelden bağımsız çalışır.' : 'Yerel analiz bekliyor.');
+  }
+  if (analysis.status === 'failed') return muted(`Yerel analiz başarısız: ${analysis.error ?? 'bilinmeyen hata'}. Kural sonucu geçerli.`);
+  const parsed = localAnalysisSchema.safeParse(analysis.output);
+  if (analysis.status !== 'completed' || !parsed.success) return muted('Yerel analiz sürüyor.');
+
+  const output = parsed.data;
+  const evidenceById = new Map(lead.business.evidence.map((e) => [e.id, e]));
+  const stale = lead.lastEvaluatedAt !== null && analysis.createdAt < lead.lastEvaluatedAt;
+  const badge = assessmentBadge[output.assessment];
+  return (
+    <div className="flex flex-col gap-2.5 text-[13px]">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge tone={badge.tone}>{badge.label}</Badge>
+        {stale ? <Badge tone="warning">Eski kanıta ait</Badge> : null}
+      </div>
+      <p className="text-fg">{output.summary}</p>
+      {output.evidenceIds.length > 0 ? (
+        <p className="text-fg-muted">
+          Dayandığı bulgular: {output.evidenceIds.map((id) => labelFor(evidenceById.get(id)?.signal ?? id)).join(', ')}
+        </p>
+      ) : null}
+      {output.uncertainties.length > 0 ? (
+        <ul className="list-disc pl-5 text-fg-muted">
+          {output.uncertainties.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      ) : null}
+      {output.suggestedNextStep ? <p className="text-fg">Önerilen adım: {output.suggestedNextStep}</p> : null}
+      <p className="text-[12px] text-fg-subtle">
+        {analysis.model} · {analysis.promptVersion} · {formatRelative(analysis.createdAt)}. Kanıt kimlikleri doğrulandı; yorumun doğruluğu garanti edilmez.
+      </p>
+    </div>
+  );
 }
 
 /** Shared by the full page and the quick-view drawer. */
@@ -192,14 +252,7 @@ export function LeadDetail({ lead }: { lead: LeadDetailData }) {
       </Section>
 
       <Section title="Yerel AI yorumu" description="Kural sonucundan ayrıdır ve puanı değiştirmez.">
-        <p className="flex items-center gap-2 text-[13px] text-fg-muted">
-          <Bot className="size-4 shrink-0 text-fg-subtle" aria-hidden />
-          {aiMode === 'disabled'
-            ? 'Yerel model kapalı. Kural değerlendirmesi modelden bağımsız çalışır.'
-            : analysis
-              ? `Son analiz: ${analysis.status} · ${formatRelative(analysis.createdAt)}`
-              : 'Yerel analiz bekliyor.'}
-        </p>
+        <AiComment lead={lead} aiMode={aiMode} analysis={analysis} />
       </Section>
 
       <Section title="Notlar" description="Uygulama içi notlar. Google Sheets'teki kullanıcı sütunlarından ayrı tutulur.">
