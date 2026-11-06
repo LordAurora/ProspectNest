@@ -228,7 +228,7 @@ function FilterSelect({
       <label htmlFor={`filter-${id}`} className="sr-only">
         {label}
       </label>
-      <Select id={`filter-${id}`} name={id} defaultValue={value ?? ''} className="h-8 w-auto max-w-[200px]">
+      <Select id={`filter-${id}`} name={id} defaultValue={value ?? ''} className="h-8 w-[calc(50%-4px)] sm:w-auto sm:max-w-[200px]">
         <option value="">{all}</option>
         {options.map(([optionValue, optionLabel]) => (
           <option key={optionValue} value={optionValue}>

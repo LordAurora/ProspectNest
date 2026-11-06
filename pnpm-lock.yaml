@@ -17,9 +17,6 @@ importers:
 
   apps/web:
     dependencies:
-      '@next/env':
-        specifier: 16.4.5
-        version: 16.4.5
       '@prospectnest/core':
         specifier: workspace:*
         version: link:../../packages/core

@@ -1,9 +1,13 @@
 import { cn } from '@/lib/cn';
 
-/** Only the table region scrolls horizontally; the page never does. */
+/**
+ * Only the table region scrolls horizontally; the page never does. `relative`
+ * makes the wrapper the containing block for absolutely positioned descendants
+ * (e.g. sr-only labels), which would otherwise escape the clip and widen the page.
+ */
 export function Table({ className, children }: { className?: string; children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className={cn('w-full border-collapse text-left text-[14px]', className)}>{children}</table>
     </div>
   );

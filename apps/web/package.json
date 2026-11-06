@@ -4,13 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node scripts/next.mjs dev",
+    "build": "node scripts/next.mjs build",
+    "start": "node scripts/next.mjs start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@next/env": "16.4.5",
     "@prospectnest/core": "workspace:*",
     "@prospectnest/db": "workspace:*",
     "@prospectnest/providers": "workspace:*",

@@ -1,13 +1,10 @@
 import path from 'node:path';
-import { loadEnvConfig } from '@next/env';
 import type { NextConfig } from 'next';
 
 const workspaceRoot = path.join(import.meta.dirname, '../..');
 
-// One .env at the workspace root serves web, worker and the Prisma CLI.
-loadEnvConfig(workspaceRoot);
-
 const config: NextConfig = {
+  // The root .env is loaded by the package scripts (scripts/next.mjs); containers get real env vars.
   output: 'standalone',
   outputFileTracingRoot: workspaceRoot,
   transpilePackages: ['@prospectnest/core', '@prospectnest/db', '@prospectnest/providers'],
