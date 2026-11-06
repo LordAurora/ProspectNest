@@ -1,0 +1,145 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens. See docs/DESIGN_SYSTEM.md for the rationale.
+ * Components use the semantic utilities generated from @theme below
+ * (bg-surface, text-fg-muted, border-border, ...) — never raw hex values.
+ */
+
+:root {
+  color-scheme: light;
+  --canvas: #f7f8fa;
+  --surface: #ffffff;
+  --surface-muted: #f1f3f6;
+  --surface-hover: #f4f6f8;
+  --fg: #17212b;
+  --fg-muted: #596575;
+  --fg-subtle: #848e9c;
+  --border: #e3e7ec;
+  --border-strong: #cdd3db;
+  --accent: #2457d6;
+  --accent-hover: #1d47b3;
+  --accent-soft: #eaf0fd;
+  --accent-fg: #ffffff;
+  --success: #1c7a4c;
+  --success-soft: #e6f4ec;
+  --warning: #9a5a06;
+  --warning-soft: #fcf2df;
+  --danger: #bf3131;
+  --danger-soft: #fbeaea;
+  --ring: rgb(36 87 214 / 0.35);
+  --shadow-overlay: 0 8px 24px rgb(23 33 43 / 0.12), 0 2px 6px rgb(23 33 43 / 0.06);
+}
+
+/* Dark keeps the same hierarchy with its own values instead of inverting. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --canvas: #0e1318;
+    --surface: #151b22;
+    --surface-muted: #1b232c;
+    --surface-hover: #1d262f;
+    --fg: #e5e9ee;
+    --fg-muted: #a0aab7;
+    --fg-subtle: #6d7886;
+    --border: #252e38;
+    --border-strong: #35404c;
+    --accent: #6f95f6;
+    --accent-hover: #8badf8;
+    --accent-soft: #1a2846;
+    --accent-fg: #0b1220;
+    --success: #4dbf88;
+    --success-soft: #11291c;
+    --warning: #e2a64c;
+    --warning-soft: #30240f;
+    --danger: #ef7b7b;
+    --danger-soft: #361717;
+    --ring: rgb(111 149 246 / 0.4);
+    --shadow-overlay: 0 8px 24px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.3);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: #0e1318;
+  --surface: #151b22;
+  --surface-muted: #1b232c;
+  --surface-hover: #1d262f;
+  --fg: #e5e9ee;
+  --fg-muted: #a0aab7;
+  --fg-subtle: #6d7886;
+  --border: #252e38;
+  --border-strong: #35404c;
+  --accent: #6f95f6;
+  --accent-hover: #8badf8;
+  --accent-soft: #1a2846;
+  --accent-fg: #0b1220;
+  --success: #4dbf88;
+  --success-soft: #11291c;
+  --warning: #e2a64c;
+  --warning-soft: #30240f;
+  --danger: #ef7b7b;
+  --danger-soft: #361717;
+  --ring: rgb(111 149 246 / 0.4);
+  --shadow-overlay: 0 8px 24px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.3);
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --radius-control: 7px;
+  --radius-panel: 11px;
+  --shadow-overlay: var(--shadow-overlay);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--canvas);
+    color: var(--fg);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

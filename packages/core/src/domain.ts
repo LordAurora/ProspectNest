@@ -22,7 +22,18 @@ export const runStatusLabel: Record<RunStatus, string> = {
   cancelled: 'İptal edildi',
 };
 
-export const PRIORITIES = ['high', 'medium', 'low', 'not_evaluated'] as const;
+export const RUN_KINDS = ['import', 'research', 'discovery', 'recheck', 'sync'] as const;
+export type RunKind = (typeof RUN_KINDS)[number];
+
+export const runKindLabel: Record<RunKind, string> = {
+  import: 'İçe aktarma',
+  research: 'Araştırma',
+  discovery: 'Keşif',
+  recheck: 'Yeniden kontrol',
+  sync: 'Aktarım',
+};
+
+export const PRIORITIES =['high', 'medium', 'low', 'not_evaluated'] as const;
 export type Priority = (typeof PRIORITIES)[number];
 
 export const priorityLabel: Record<Priority, string> = {
