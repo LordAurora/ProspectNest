@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Target } from 'lucide-react';
+import { Plus, Target } from 'lucide-react';
 import { serviceTemplateLabel } from '@prospectnest/core';
 import { db } from '@/lib/db';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
+import { buttonClass } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader, Panel } from '@/components/ui/panel';
 import { TD, TH, THead, TR, Table } from '@/components/ui/table';
@@ -32,13 +33,27 @@ export default async function CampaignsPage() {
 
   return (
     <>
-      <PageHeader title="Kampanyalar" description="Hizmet şablonu, hedef bölge ve araştırma sınırları kampanya bazında tanımlanır." />
+      <PageHeader
+        title="Kampanyalar"
+        description="Hizmet şablonu, hedef bölge ve araştırma sınırları kampanya bazında tanımlanır."
+        action={
+          <Link href="/campaigns/new" className={buttonClass({ variant: 'primary' })}>
+            <Plus aria-hidden />
+            Kampanya oluştur
+          </Link>
+        }
+      />
       <Panel>
         {campaigns.length === 0 ? (
           <EmptyState
             icon={Target}
             title="Henüz kampanya yok"
-            description="Kampanya oluşturma sihirbazı bir sonraki sürümde eklenecek. Şimdilik demo verisi yüklenebilir."
+            description="Ne sattığınızı ve kimi hedeflediğinizi tanımlayarak ilk kampanyanızı oluşturun."
+            action={
+              <Link href="/campaigns/new" className={buttonClass({ variant: 'primary' })}>
+                Kampanya oluştur
+              </Link>
+            }
           />
         ) : (
           <Table className="min-w-[760px]">
@@ -56,7 +71,7 @@ export default async function CampaignsPage() {
                   <TD className="max-w-[340px]">
                     <div className="flex items-center gap-2">
                       <Link
-                        href={`/businesses?campaign=${campaign.id}`}
+                        href={`/campaigns/${campaign.id}`}
                         className="truncate font-medium text-fg hover:text-accent"
                       >
                         {campaign.name}

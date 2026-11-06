@@ -26,6 +26,9 @@ importers:
       '@prospectnest/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@prospectnest/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
       clsx:
         specifier: 2.1.1
         version: 2.1.1

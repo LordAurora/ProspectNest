@@ -6,6 +6,7 @@ import { formatNumber, formatRelative } from '@/lib/format';
 import { priorityTone, runStatusTone } from '@/lib/status';
 import { getIntegrationSummaries, getWorkerState } from '@/lib/system';
 import { Badge } from '@/components/ui/badge';
+import { buttonClass } from '@/components/ui/button';
 import { PageHeader, Panel, PanelHeader } from '@/components/ui/panel';
 import { TD, TH, THead, TR, Table } from '@/components/ui/table';
 import { cn } from '@/lib/cn';
@@ -244,7 +245,15 @@ const steps = [
 function GettingStarted() {
   return (
     <>
-      <PageHeader title="Genel bakış" description="Başlamak için üç adım yeterli." />
+      <PageHeader
+        title="Genel bakış"
+        description="Başlamak için üç adım yeterli."
+        action={
+          <Link href="/campaigns/new" className={buttonClass({ variant: 'primary' })}>
+            Kampanya oluştur
+          </Link>
+        }
+      />
       <Panel className="max-w-3xl">
         <ol className="divide-y divide-border">
           {steps.map((step, index) => (

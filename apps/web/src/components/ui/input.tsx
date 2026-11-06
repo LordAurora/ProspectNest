@@ -21,6 +21,12 @@ export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<H
   },
 );
 
+export const Textarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  function Textarea({ className, ...props }, ref) {
+    return <textarea ref={ref} className={cn(controlClass, 'h-auto min-h-[88px] py-2 leading-relaxed', className)} {...props} />;
+  },
+);
+
 export function Field({
   label,
   htmlFor,

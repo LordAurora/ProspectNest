@@ -83,6 +83,7 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
             district: true,
             category: true,
             lastCheckedAt: true,
+            duplicateOfId: true,
             _count: { select: { evidence: { where: { observationStatus: 'present' } } } },
             contacts: { select: { kind: true } },
           },
@@ -206,9 +207,16 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
                 return (
                   <TR key={row.id}>
                     <TD className="max-w-[320px]">
-                      <p className="truncate font-medium text-fg" title={business.name}>
-                        {business.name}
-                      </p>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="truncate font-medium text-fg" title={business.name}>
+                          {business.name}
+                        </p>
+                        {business.duplicateOfId ? (
+                          <Badge tone="warning" className="shrink-0">
+                            Olası eşleşme
+                          </Badge>
+                        ) : null}
+                      </div>
                       <p className="truncate text-[12px] text-fg-muted">
                         {business.domain ?? 'Web sitesi yok'}
                         {filters.campaign ? null : <span className="text-fg-subtle"> · {row.campaign.name}</span>}

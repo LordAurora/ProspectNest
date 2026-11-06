@@ -10,7 +10,7 @@ loadEnvConfig(workspaceRoot);
 const config: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: workspaceRoot,
-  transpilePackages: ['@prospectnest/core', '@prospectnest/db'],
+  transpilePackages: ['@prospectnest/core', '@prospectnest/db', '@prospectnest/providers'],
   serverExternalPackages: ['@node-rs/argon2', 'pg'],
   poweredByHeader: false,
   async headers() {
