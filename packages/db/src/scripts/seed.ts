@@ -5,7 +5,7 @@
  */
 import path from 'node:path';
 import { config } from 'dotenv';
-import { normalizeDomain, normalizeName } from '@prospectnest/core';
+import { defaultRuleSet, normalizeDomain, normalizeName } from '@prospectnest/core';
 import { getDb } from '../client';
 import type { ObservationStatus, Priority } from '../generated/prisma/client';
 
@@ -184,6 +184,8 @@ async function main() {
         name: 'Demo · QR menü — Ege ve İç Anadolu',
         serviceDescription: 'Restoran ve kafeler için QR menü kurulumu',
         template: 'qr_menu',
+        rules: defaultRuleSet('qr_menu'),
+        source: 'csv',
         countries: ['TR'],
         cities: ['İstanbul', 'İzmir', 'Ankara'],
         categories: ['Kafe', 'Restoran', 'Fırın', 'Lokanta', 'Tatlıcı'],
