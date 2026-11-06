@@ -25,25 +25,39 @@ export const hasDemoData = cache(async (): Promise<boolean> => {
 export type IntegrationSummary = {
   key: 'sheets' | 'discovery' | 'ollama';
   name: string;
-  state: 'not_configured' | 'configured' | 'disabled';
+  state: 'not_configured' | 'configured' | 'healthy' | 'error' | 'disabled';
   detail: string;
+  lastSuccessAt?: Date | null;
 };
 
 /**
- * Reports configuration only. A configured integration is not reported as
- * working until its own health check (later phases) has actually succeeded.
+ * Configuration plus the last real health check. An integration is reported
+ * as working only after its own check or sync actually succeeded.
  */
-export function getIntegrationSummaries(): IntegrationSummary[] {
+export const getIntegrationSummaries = cache(async (): Promise<IntegrationSummary[]> => {
   const e = env();
   const sheetsConfigured = Boolean(e.GOOGLE_APPLICATION_CREDENTIALS && e.GOOGLE_SPREADSHEET_ID);
+  const sheetsRow = sheetsConfigured ? await db().integration.findUnique({ where: { kind: 'google_sheets' } }) : null;
+  const sheetsState: IntegrationSummary['state'] = !sheetsConfigured
+    ? 'not_configured'
+    : sheetsRow?.status === 'healthy'
+      ? 'healthy'
+      : sheetsRow?.status === 'error'
+        ? 'error'
+        : 'configured';
   return [
     {
       key: 'sheets',
       name: 'Google Sheets',
-      state: sheetsConfigured ? 'configured' : 'not_configured',
-      detail: sheetsConfigured
-        ? 'Kimlik bilgisi tanımlı; bağlantı henüz test edilmedi.'
-        : 'Service account anahtarı ve tablo kimliği tanımlı değil. CSV dışa aktarımı kullanılabilir.',
+      state: sheetsState,
+      lastSuccessAt: sheetsRow?.lastSuccessAt ?? null,
+      detail: !sheetsConfigured
+        ? 'Service account anahtarı ve tablo kimliği tanımlı değil. CSV dışa aktarımı kullanılabilir.'
+        : sheetsState === 'error'
+          ? (sheetsRow?.lastError ?? 'Son bağlantı denemesi başarısız oldu.')
+          : sheetsState === 'healthy'
+            ? 'Bağlantı doğrulandı.'
+            : 'Kimlik bilgisi tanımlı; bağlantı henüz test edilmedi.',
     },
     {
       key: 'discovery',
@@ -66,4 +80,4 @@ export function getIntegrationSummaries(): IntegrationSummary[] {
             : 'AI_MODE=local fakat OLLAMA_MODEL tanımlı değil.',
     },
   ];
-}
+});

@@ -12,6 +12,7 @@
   "dependencies": {
     "@prospectnest/core": "workspace:*",
     "@prospectnest/db": "workspace:*",
+    "@prospectnest/integrations": "workspace:*",
     "@prospectnest/providers": "workspace:*",
     "clsx": "2.1.1",
     "lucide-react": "1.70.0",

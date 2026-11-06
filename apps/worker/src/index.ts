@@ -6,8 +6,10 @@ import { startDispatcher, type ResearchJob } from './dispatcher';
 import { startHeartbeat } from './heartbeat';
 import { PURGE_SESSIONS_JOB, purgeExpiredSessions } from './jobs/maintenance';
 import { processResearchRun } from './jobs/research';
+import { processSyncRun } from './jobs/sheets';
 import { logger } from './logger';
 import { createResearcher } from './researcher';
+import { createGoogleSheetsApi } from '@prospectnest/integrations';
 
 async function main() {
   const env = workerEnvSchema.parse(process.env);
@@ -19,6 +21,7 @@ async function main() {
 
   await boss.createQueue(QUEUES.maintenance);
   await boss.createQueue(QUEUES.research);
+  await boss.createQueue(QUEUES.sync);
 
   // Maintenance jobs share one queue; the job name travels in the payload.
   await boss.schedule(QUEUES.maintenance, '17 * * * *', { job: PURGE_SESSIONS_JOB }, { key: PURGE_SESSIONS_JOB });
@@ -37,6 +40,20 @@ async function main() {
         await evaluateCampaignBusiness(getDb(), campaignBusinessId);
       },
     });
+  });
+
+  // Sync runs are only created when credentials exist; without them the job fails with a clear message.
+  const credentials = env.GOOGLE_APPLICATION_CREDENTIALS;
+  await boss.work<ResearchJob>(QUEUES.sync, { batchSize: 1 }, async ([job]) => {
+    if (!job) return;
+    if (!credentials) {
+      await getDb().run.update({
+        where: { id: job.data.runId },
+        data: { status: 'failed', error: 'Google Sheets kimlik bilgisi tanımlı değil.', finishedAt: new Date() },
+      });
+      return;
+    }
+    await processSyncRun(job.data.runId, createGoogleSheetsApi(credentials));
   });
 
   const stopDispatcher = startDispatcher(boss);

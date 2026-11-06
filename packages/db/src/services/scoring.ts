@@ -1,5 +1,6 @@
 import { defaultRuleSet, evaluate, ruleSetSchema, type Evaluation } from '@prospectnest/core';
 import type { Prisma, PrismaClient } from '../generated/prisma/client';
+import { enqueueSheetChange } from './export';
 
 type Client = PrismaClient | Prisma.TransactionClient;
 
@@ -57,27 +58,33 @@ export async function evaluateCampaignBusiness(db: Client, campaignBusinessId: s
   if (unchanged) return evaluation;
 
   const now = new Date();
-  await db.ruleEvaluation.create({
-    data: {
-      campaignBusinessId: lead.id,
-      ruleVersion: lead.campaign.ruleVersion,
-      score: evaluation.score,
-      evidenceCoverage: evaluation.evidenceCoverage,
-      contactability: evaluation.contactability,
-      priority: evaluation.priority,
-      results: evaluation.results,
-      evidenceIds: evaluation.evidenceIds,
-    },
-  });
-  await db.campaignBusiness.update({
-    where: { id: lead.id },
-    data: {
-      opportunityScore: evaluation.score,
-      evidenceCoverage: evaluation.evidenceCoverage,
-      contactability: evaluation.contactability,
-      priority: evaluation.priority,
-      lastEvaluatedAt: now,
-    },
-  });
+  // The score change and its Sheets outbox entry commit together or not at all.
+  const write = async (tx: Client) => {
+    await tx.ruleEvaluation.create({
+      data: {
+        campaignBusinessId: lead.id,
+        ruleVersion: lead.campaign.ruleVersion,
+        score: evaluation.score,
+        evidenceCoverage: evaluation.evidenceCoverage,
+        contactability: evaluation.contactability,
+        priority: evaluation.priority,
+        results: evaluation.results,
+        evidenceIds: evaluation.evidenceIds,
+      },
+    });
+    await tx.campaignBusiness.update({
+      where: { id: lead.id },
+      data: {
+        opportunityScore: evaluation.score,
+        evidenceCoverage: evaluation.evidenceCoverage,
+        contactability: evaluation.contactability,
+        priority: evaluation.priority,
+        lastEvaluatedAt: now,
+      },
+    });
+    await enqueueSheetChange(tx, lead.id);
+  };
+  if ('$transaction' in db) await db.$transaction(write);
+  else await write(db);
   return evaluation;
 }

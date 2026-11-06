@@ -49,6 +49,7 @@ export const workerEnvSchema = serverEnvSchema.pick({
   WORKER_CONCURRENCY: true,
   AI_MODE: true,
   DEMO_MODE: true,
+  GOOGLE_APPLICATION_CREDENTIALS: true,
 });
 
 export type WorkerEnv = z.infer<typeof workerEnvSchema>;

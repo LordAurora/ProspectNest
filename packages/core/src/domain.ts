@@ -94,4 +94,5 @@ export const WORKER_HEARTBEAT_INTERVAL_MS = 30_000;
 export const QUEUES = {
   research: 'research',
   maintenance: 'maintenance',
+  sync: 'sync',
 } as const;

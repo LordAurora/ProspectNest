@@ -18,19 +18,19 @@ export function startDispatcher(boss: PgBoss): () => void {
 
   const tick = async () => {
     try {
-      const claimed = await db.$queryRaw<{ id: string }[]>`
+      const claimed = await db.$queryRaw<{ id: string; kind: string }[]>`
         UPDATE "Run" SET "dispatchedAt" = now()
         WHERE id IN (
           SELECT id FROM "Run"
-          WHERE status = 'queued' AND "dispatchedAt" IS NULL AND kind IN ('research', 'recheck')
+          WHERE status = 'queued' AND "dispatchedAt" IS NULL AND kind IN ('research', 'recheck', 'sync')
           ORDER BY "createdAt"
           LIMIT 10
           FOR UPDATE SKIP LOCKED
         )
-        RETURNING id`;
-      for (const { id } of claimed) {
+        RETURNING id, kind::text AS kind`;
+      for (const { id, kind } of claimed) {
         try {
-          await boss.send(QUEUES.research, { runId: id } satisfies ResearchJob, {
+          await boss.send(kind === 'sync' ? QUEUES.sync : QUEUES.research, { runId: id } satisfies ResearchJob, {
             singletonKey: id,
             retryLimit: 3,
             retryDelay: 60,

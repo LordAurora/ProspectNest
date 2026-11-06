@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowRight, Upload } from 'lucide-react';
+import { ArrowRight, Download, Upload } from 'lucide-react';
 import { z } from 'zod';
 import {
   priorityLabel,
@@ -21,6 +21,7 @@ import { runStatusTone } from '@/lib/status';
 import { Badge } from '@/components/ui/badge';
 import { buttonClass } from '@/components/ui/button';
 import { PageHeader, Panel, PanelHeader } from '@/components/ui/panel';
+import { SheetSyncButton } from '@/components/integration-actions';
 import { StartResearchButton } from '@/components/run-actions';
 import { ManualBusinessForm } from './manual-business-form';
 
@@ -44,7 +45,7 @@ export default async function CampaignPage({ params }: Props) {
   const campaign = await loadCampaign((await params).id);
   if (!campaign || campaign.archivedAt) notFound();
 
-  const [byPriority, imports, total, activeRun] = await Promise.all([
+  const [byPriority, imports, total, activeRun, sheetSync] = await Promise.all([
     db().campaignBusiness.groupBy({ by: ['priority'], where: { campaignId: campaign.id }, _count: true }),
     db().run.findMany({
       where: { campaignId: campaign.id, kind: 'import' },
@@ -57,10 +58,12 @@ export default async function CampaignPage({ params }: Props) {
       where: { campaignId: campaign.id, kind: { in: ['research', 'recheck', 'discovery'] }, status: { in: ['queued', 'running'] } },
       select: { id: true },
     }),
+    db().sheetSync.findUnique({ where: { campaignId: campaign.id } }),
   ]);
 
   const ruleSet = ruleSetSchema.safeParse(campaign.rules);
   const discovery = resolveDiscoveryProvider(env().DISCOVERY_PROVIDER);
+  const sheetsConfigured = Boolean(env().GOOGLE_APPLICATION_CREDENTIALS && env().GOOGLE_SPREADSHEET_ID);
   const counts = Object.fromEntries(byPriority.map((row) => [row.priority, row._count]));
 
   return (
@@ -145,6 +148,28 @@ export default async function CampaignPage({ params }: Props) {
         </div>
 
         <div className="flex flex-col gap-6">
+          <Panel>
+            <PanelHeader title="Dışa aktarım" description="Sentetik ve aktarımı yasak kaynaklı kayıtlar dışarıda kalır." />
+            <div className="flex flex-col gap-3 px-4 py-4 text-[13px]">
+              {sheetsConfigured ? (
+                <>
+                  <SheetSyncButton campaignId={campaign.id} />
+                  <p className="text-fg-muted">
+                    {sheetSync?.lastSyncedAt ? `Son aktarım ${formatDateTime(sheetSync.lastSyncedAt)}` : 'Henüz aktarılmadı.'}
+                    {sheetSync?.sheetTitle ? ` · Sekme: ${sheetSync.sheetTitle}` : null}
+                  </p>
+                  {sheetSync?.lastError ? <p className="text-danger">{sheetSync.lastError}</p> : null}
+                </>
+              ) : (
+                <p className="text-fg-muted">Google Sheets bağlı değil. Bağlantı için Entegrasyonlar sayfasına bakın.</p>
+              )}
+              <a href={`/api/campaigns/${campaign.id}/export`} className={cn(buttonClass({ variant: 'ghost', size: 'sm' }), 'self-start')} download>
+                <Download aria-hidden />
+                CSV olarak indir
+              </a>
+            </div>
+          </Panel>
+
           <Panel>
             <PanelHeader title="Hedef ve program" />
             <dl className="grid grid-cols-[120px_minmax(0,1fr)] gap-x-4 gap-y-2.5 px-4 py-4 text-[13px]">

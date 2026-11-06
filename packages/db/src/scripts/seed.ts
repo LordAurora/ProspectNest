@@ -195,6 +195,7 @@ async function main() {
               provider: 'demo',
               externalId: item.key,
               attribution: 'Sentetik demo verisi',
+              exportPolicy: 'forbidden',
               fieldOrigins: { name: 'demo', website: 'demo', phone: 'demo' },
             },
           },

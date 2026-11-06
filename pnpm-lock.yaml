@@ -23,6 +23,9 @@ importers:
       '@prospectnest/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@prospectnest/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       '@prospectnest/providers':
         specifier: workspace:*
         version: link:../../packages/providers
@@ -69,6 +72,9 @@ importers:
       '@prospectnest/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@prospectnest/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       '@prospectnest/research':
         specifier: workspace:*
         version: link:../../packages/research
@@ -129,6 +135,9 @@ importers:
       tsx:
         specifier: 4.23.15
         version: 4.23.15
+      vitest:
+        specifier: 4.1.12
+        version: 4.1.12(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.6(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/integrations:
     dependencies:

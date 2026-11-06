@@ -57,8 +57,7 @@ async function loadOverview() {
 }
 
 export default async function OverviewPage() {
-  const [data, worker] = await Promise.all([loadOverview(), getWorkerState()]);
-  const integrations = getIntegrationSummaries();
+  const [data, worker, integrations] = await Promise.all([loadOverview(), getWorkerState(), getIntegrationSummaries()]);
 
   if (data.campaignCount === 0) return <GettingStarted />;
 
@@ -91,7 +90,9 @@ export default async function OverviewPage() {
     });
   }
   for (const integration of integrations) {
-    if (integration.state === 'not_configured') {
+    if (integration.state === 'error') {
+      attention.push({ tone: 'danger', text: `${integration.name}: ${integration.detail}`, href: '/integrations' });
+    } else if (integration.state === 'not_configured') {
       attention.push({ tone: 'neutral', text: `${integration.name} bağlı değil.`, href: '/integrations' });
     }
   }

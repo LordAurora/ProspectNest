@@ -7,8 +7,8 @@ const config: NextConfig = {
   // The root .env is loaded by the package scripts (scripts/next.mjs); containers get real env vars.
   output: 'standalone',
   outputFileTracingRoot: workspaceRoot,
-  transpilePackages: ['@prospectnest/core', '@prospectnest/db', '@prospectnest/providers'],
-  serverExternalPackages: ['@node-rs/argon2', 'pg'],
+  transpilePackages: ['@prospectnest/core', '@prospectnest/db', '@prospectnest/providers', '@prospectnest/integrations'],
+  serverExternalPackages: ['@node-rs/argon2', 'pg', 'google-auth-library'],
   poweredByHeader: false,
   async headers() {
     return [
