@@ -131,7 +131,9 @@ export default async function OverviewPage() {
                   {data.topLeads.map((lead) => (
                     <TR key={lead.id}>
                       <TD>
-                        <p className="max-w-[320px] truncate font-medium text-fg">{lead.business.name}</p>
+                        <Link href={`/businesses/${lead.id}`} className="block max-w-[320px] truncate font-medium text-fg hover:text-accent">
+                          {lead.business.name}
+                        </Link>
                         {lead.business.domain ? (
                           <p className="truncate text-[12px] text-fg-muted">{lead.business.domain}</p>
                         ) : null}

@@ -1,31 +1,35 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Building2, ChevronLeft, ChevronRight, Mail, Phone, SearchX } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, SearchX } from 'lucide-react';
 import { z } from 'zod';
-import { PRIORITIES, priorityLabel } from '@prospectnest/core';
+import { LEAD_STATUSES, PRIORITIES, leadStatusLabel, priorityLabel } from '@prospectnest/core';
 import type { Prisma } from '@prospectnest/db';
 import { db } from '@/lib/db';
 import { cn } from '@/lib/cn';
-import { formatNumber, formatRelative } from '@/lib/format';
-import { priorityTone } from '@/lib/status';
-import { Badge } from '@/components/ui/badge';
+import { formatNumber } from '@/lib/format';
+import { loadLead } from '@/lib/leads';
+import { LeadDetail } from '@/components/lead/lead-detail';
 import { buttonClass } from '@/components/ui/button';
+import { Drawer } from '@/components/ui/drawer';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input, Select } from '@/components/ui/input';
 import { PageHeader, Panel } from '@/components/ui/panel';
-import { TD, TH, THead, TR, Table } from '@/components/ui/table';
+import { BusinessTable, type BusinessRow } from './business-table';
 
 export const metadata: Metadata = { title: 'İşletmeler' };
 export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 25;
+const FILTER_KEYS = ['q', 'campaign', 'city', 'priority', 'status'] as const;
 
 const filtersSchema = z.object({
   q: z.string().trim().max(120).optional().catch(undefined),
   campaign: z.uuid().optional().catch(undefined),
   city: z.string().trim().max(80).optional().catch(undefined),
   priority: z.enum(PRIORITIES).optional().catch(undefined),
+  status: z.enum(LEAD_STATUSES).optional().catch(undefined),
   page: z.coerce.number().int().min(1).max(10_000).default(1).catch(1),
+  view: z.uuid().optional().catch(undefined),
 });
 
 type Filters = z.infer<typeof filtersSchema>;
@@ -34,6 +38,7 @@ function buildWhere(filters: Filters): Prisma.CampaignBusinessWhereInput {
   const where: Prisma.CampaignBusinessWhereInput = {};
   if (filters.campaign) where.campaignId = filters.campaign;
   if (filters.priority) where.priority = filters.priority;
+  if (filters.status) where.status = filters.status;
   const business: Prisma.BusinessWhereInput = {};
   if (filters.city) business.city = filters.city;
   if (filters.q) {
@@ -47,13 +52,16 @@ function buildWhere(filters: Filters): Prisma.CampaignBusinessWhereInput {
   return where;
 }
 
-function pageHref(filters: Filters, page: number) {
+function href(filters: Filters, overrides: { page?: number; view?: string | null } = {}) {
   const params = new URLSearchParams();
-  for (const key of ['q', 'campaign', 'city', 'priority'] as const) {
+  for (const key of FILTER_KEYS) {
     const value = filters[key];
     if (value) params.set(key, value);
   }
+  const page = overrides.page ?? filters.page;
   if (page > 1) params.set('page', String(page));
+  const view = overrides.view === undefined ? filters.view : overrides.view;
+  if (view) params.set('view', view);
   const query = params.toString();
   return query ? `/businesses?${query}` : '/businesses';
 }
@@ -61,9 +69,9 @@ function pageHref(filters: Filters, page: number) {
 export default async function BusinessesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const filters = filtersSchema.parse(await searchParams);
   const where = buildWhere(filters);
-  const hasFilters = Boolean(filters.q || filters.campaign || filters.city || filters.priority);
+  const hasFilters = FILTER_KEYS.some((key) => key !== 'campaign' && filters[key]) || Boolean(filters.campaign);
 
-  const [total, rows, campaigns, cities] = await Promise.all([
+  const [total, leads, campaigns, cities, viewed] = await Promise.all([
     db().campaignBusiness.count({ where }),
     db().campaignBusiness.findMany({
       where,
@@ -73,6 +81,7 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
       select: {
         id: true,
         priority: true,
+        status: true,
         opportunityScore: true,
         campaign: { select: { name: true } },
         business: {
@@ -91,13 +100,27 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
       },
     }),
     db().campaign.findMany({ where: { archivedAt: null }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-    db().business.findMany({
-      where: { city: { not: null } },
-      distinct: ['city'],
-      select: { city: true },
-      orderBy: { city: 'asc' },
-    }),
+    db().business.findMany({ where: { city: { not: null } }, distinct: ['city'], select: { city: true }, orderBy: { city: 'asc' } }),
+    filters.view ? loadLead(filters.view) : null,
   ]);
+
+  const rows: BusinessRow[] = leads.map(({ business, ...lead }) => ({
+    id: lead.id,
+    priority: lead.priority,
+    status: lead.status,
+    score: lead.opportunityScore,
+    campaignName: lead.campaign.name,
+    name: business.name,
+    domain: business.domain,
+    location: [business.district, business.city].filter(Boolean).join(', '),
+    category: business.category,
+    lastCheckedAt: business.lastCheckedAt,
+    evidenceCount: business._count.evidence,
+    hasEmail: business.contacts.some((c) => c.kind === 'email'),
+    hasPhone: business.contacts.some((c) => c.kind === 'phone'),
+    possibleDuplicate: Boolean(business.duplicateOfId),
+    viewHref: href(filters, { view: lead.id }),
+  }));
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const firstIndex = total === 0 ? 0 : (filters.page - 1) * PAGE_SIZE + 1;
@@ -112,49 +135,11 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
           <label htmlFor="filter-q" className="sr-only">
             Ara
           </label>
-          <Input
-            id="filter-q"
-            name="q"
-            type="search"
-            placeholder="Ad, domain veya şehir"
-            defaultValue={filters.q}
-            className="h-8 w-full sm:w-[240px]"
-          />
-          <label htmlFor="filter-campaign" className="sr-only">
-            Kampanya
-          </label>
-          <Select id="filter-campaign" name="campaign" defaultValue={filters.campaign ?? ''} className="h-8 w-auto max-w-[220px]">
-            <option value="">Tüm kampanyalar</option>
-            {campaigns.map((campaign) => (
-              <option key={campaign.id} value={campaign.id}>
-                {campaign.name}
-              </option>
-            ))}
-          </Select>
-          <label htmlFor="filter-city" className="sr-only">
-            Şehir
-          </label>
-          <Select id="filter-city" name="city" defaultValue={filters.city ?? ''} className="h-8 w-auto">
-            <option value="">Tüm şehirler</option>
-            {cities.map(({ city }) =>
-              city ? (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ) : null,
-            )}
-          </Select>
-          <label htmlFor="filter-priority" className="sr-only">
-            Öncelik
-          </label>
-          <Select id="filter-priority" name="priority" defaultValue={filters.priority ?? ''} className="h-8 w-auto">
-            <option value="">Tüm öncelikler</option>
-            {PRIORITIES.map((priority) => (
-              <option key={priority} value={priority}>
-                {priorityLabel[priority]}
-              </option>
-            ))}
-          </Select>
+          <Input id="filter-q" name="q" type="search" placeholder="Ad, domain veya şehir" defaultValue={filters.q} className="h-8 w-full sm:w-[220px]" />
+          <FilterSelect id="campaign" label="Kampanya" value={filters.campaign} all="Tüm kampanyalar" options={campaigns.map((c) => [c.id, c.name])} />
+          <FilterSelect id="city" label="Şehir" value={filters.city} all="Tüm şehirler" options={cities.flatMap(({ city }) => (city ? [[city, city] as const] : []))} />
+          <FilterSelect id="priority" label="Öncelik" value={filters.priority} all="Tüm öncelikler" options={PRIORITIES.map((p) => [p, priorityLabel[p]])} />
+          <FilterSelect id="status" label="Takip durumu" value={filters.status} all="Tüm durumlar" options={LEAD_STATUSES.map((s) => [s, leadStatusLabel[s]])} />
           <button type="submit" className={buttonClass({ size: 'sm' })}>
             Filtrele
           </button>
@@ -185,111 +170,77 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
               icon={Building2}
               title="Henüz işletme yok"
               description="Bir kampanyaya CSV yükleyerek veya işletmeleri tek tek ekleyerek başlayın."
+              action={
+                <Link href="/campaigns" className={buttonClass({ size: 'sm' })}>
+                  Kampanyalara git
+                </Link>
+              }
             />
           )
         ) : (
-          <Table className="min-w-[860px]">
-            <THead>
-              <TH>İşletme</TH>
-              <TH>Konum</TH>
-              <TH>Kategori</TH>
-              <TH>Öncelik</TH>
-              <TH align="right">Puan</TH>
-              <TH align="right">Kanıt</TH>
-              <TH>İletişim</TH>
-              <TH align="right">Son kontrol</TH>
-            </THead>
-            <tbody>
-              {rows.map((row) => {
-                const { business } = row;
-                const hasEmail = business.contacts.some((c) => c.kind === 'email');
-                const hasPhone = business.contacts.some((c) => c.kind === 'phone');
-                return (
-                  <TR key={row.id}>
-                    <TD className="max-w-[320px]">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <p className="truncate font-medium text-fg" title={business.name}>
-                          {business.name}
-                        </p>
-                        {business.duplicateOfId ? (
-                          <Badge tone="warning" className="shrink-0">
-                            Olası eşleşme
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <p className="truncate text-[12px] text-fg-muted">
-                        {business.domain ?? 'Web sitesi yok'}
-                        {filters.campaign ? null : <span className="text-fg-subtle"> · {row.campaign.name}</span>}
-                      </p>
-                    </TD>
-                    <TD className="whitespace-nowrap text-fg-muted">
-                      {[business.district, business.city].filter(Boolean).join(', ') || '—'}
-                    </TD>
-                    <TD className="whitespace-nowrap text-fg-muted">{business.category ?? '—'}</TD>
-                    <TD>
-                      <Badge tone={priorityTone[row.priority]}>{priorityLabel[row.priority]}</Badge>
-                    </TD>
-                    <TD align="right" numeric className="font-medium">
-                      {row.opportunityScore ?? <span className="text-fg-subtle">—</span>}
-                    </TD>
-                    <TD align="right" numeric className="text-fg-muted">
-                      {business._count.evidence}
-                    </TD>
-                    <TD>
-                      <span className="flex items-center gap-2 text-fg-subtle">
-                        <Mail className={cn('size-4', hasEmail && 'text-fg')} aria-hidden />
-                        <span className="sr-only">{hasEmail ? 'E-posta var' : 'E-posta yok'}</span>
-                        <Phone className={cn('size-4', hasPhone && 'text-fg')} aria-hidden />
-                        <span className="sr-only">{hasPhone ? 'Telefon var' : 'Telefon yok'}</span>
-                      </span>
-                    </TD>
-                    <TD align="right" className="whitespace-nowrap text-fg-muted">
-                      {business.lastCheckedAt ? formatRelative(business.lastCheckedAt) : 'Kontrol edilmedi'}
-                    </TD>
-                  </TR>
-                );
-              })}
-            </tbody>
-          </Table>
+          <BusinessTable rows={rows} singleCampaign={Boolean(filters.campaign)} />
         )}
 
         {total > PAGE_SIZE ? (
-          <nav
-            aria-label="Sayfalama"
-            className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5 text-[13px] text-fg-muted"
-          >
+          <nav aria-label="Sayfalama" className="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5 text-[13px] text-fg-muted">
             <span className="tabular-nums">
               {formatNumber(firstIndex)}–{formatNumber(lastIndex)} / {formatNumber(total)}
             </span>
             <div className="flex items-center gap-1">
-              <PageLink href={pageHref(filters, filters.page - 1)} disabled={filters.page <= 1} label="Önceki sayfa">
+              <PageLink href={href(filters, { page: filters.page - 1, view: null })} disabled={filters.page <= 1} label="Önceki sayfa">
                 <ChevronLeft aria-hidden />
               </PageLink>
               <span className="px-2 tabular-nums">
                 {filters.page} / {pageCount}
               </span>
-              <PageLink href={pageHref(filters, filters.page + 1)} disabled={filters.page >= pageCount} label="Sonraki sayfa">
+              <PageLink href={href(filters, { page: filters.page + 1, view: null })} disabled={filters.page >= pageCount} label="Sonraki sayfa">
                 <ChevronRight aria-hidden />
               </PageLink>
             </div>
           </nav>
         ) : null}
       </Panel>
+
+      {viewed ? (
+        <Drawer label={viewed.business.name} closeHref={href(filters, { view: null })} fullHref={`/businesses/${viewed.id}`}>
+          <LeadDetail lead={viewed} />
+        </Drawer>
+      ) : null}
     </>
   );
 }
 
-function PageLink({
-  href,
-  disabled,
+function FilterSelect({
+  id,
   label,
-  children,
+  value,
+  all,
+  options,
 }: {
-  href: string;
-  disabled: boolean;
+  id: string;
   label: string;
-  children: React.ReactNode;
+  value: string | undefined;
+  all: string;
+  options: readonly (readonly [string, string])[];
 }) {
+  return (
+    <>
+      <label htmlFor={`filter-${id}`} className="sr-only">
+        {label}
+      </label>
+      <Select id={`filter-${id}`} name={id} defaultValue={value ?? ''} className="h-8 w-auto max-w-[200px]">
+        <option value="">{all}</option>
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>
+            {optionLabel}
+          </option>
+        ))}
+      </Select>
+    </>
+  );
+}
+
+function PageLink({ href, disabled, label, children }: { href: string; disabled: boolean; label: string; children: React.ReactNode }) {
   const className = cn(buttonClass({ variant: 'ghost', size: 'sm' }), 'w-8 px-0');
   if (disabled) {
     return (
