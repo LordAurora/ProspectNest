@@ -388,6 +388,11 @@ model SheetSync {
   sheetTitle    String
   lastSyncedAt  DateTime?
   lastError     String?
+  /// Single-writer lease: only the holder may write to this spreadsheet tab.
+  lockOwner     String?
+  lockedUntil   DateTime?
+  /// Rows written in the last sync, for the UI.
+  lastResult    Json?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
