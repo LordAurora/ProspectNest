@@ -61,7 +61,7 @@ describe('researchWebsite', () => {
   it('keeps headings out of excerpts', async () => {
     const outcome = await research('https://egesofrasi.example/');
     const observation = outcome.observations.find((o) => o.signal === 'menu_by_phone_request');
-    expect(observation?.excerpt).toBe('Güncel menü için WhatsApp hattımızdan yazabilirsiniz.');
+    expect(observation?.excerpt).toBe('Güncel menü için WhatsApp hattımızdan yazabilirsiniz');
   });
 
   it('reports not_observed for a reachable page without evidence', async () => {
