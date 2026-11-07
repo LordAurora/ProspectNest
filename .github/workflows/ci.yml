@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: prospectnest
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: prospectnest_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U prospectnest -d prospectnest_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      # Disposable CI database only; DB integration tests run against it.
+      DATABASE_URL: postgresql://prospectnest:ci-only-password@localhost:5432/prospectnest_test
+      TEST_DATABASE_URL: postgresql://prospectnest:ci-only-password@localhost:5432/prospectnest_test
+      SESSION_SECRET: ci-session-secret-not-used-in-production-0000
+      NEXT_TELEMETRY_DISABLED: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Apply migrations
+        run: pnpm db:migrate
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build web
+        run: pnpm --filter @prospectnest/web build
