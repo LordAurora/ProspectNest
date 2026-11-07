@@ -1,7 +1,8 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens. See docs/DESIGN_SYSTEM.md for the rationale.
+ * Design tokens: neutral surfaces, one accent, measured status colours.
+ * Dark mode has its own values with the same hierarchy rather than an inversion.
  * Components use the semantic utilities generated from @theme below
  * (bg-surface, text-fg-muted, border-border, ...) — never raw hex values.
  */
