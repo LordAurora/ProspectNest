@@ -16,6 +16,8 @@
     "@prospectnest/integrations": "workspace:*",
     "@prospectnest/providers": "workspace:*",
     "clsx": "2.1.1",
+    "exceljs": "4.4.0",
+    "google-auth-library": "11.3.3",
     "lucide-react": "1.70.0",
     "next": "16.4.5",
     "react": "19.3.1",

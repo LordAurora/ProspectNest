@@ -8,7 +8,7 @@ const config: NextConfig = {
   output: 'standalone',
   outputFileTracingRoot: workspaceRoot,
   transpilePackages: ['@prospectnest/core', '@prospectnest/db', '@prospectnest/providers', '@prospectnest/integrations'],
-  serverExternalPackages: ['@node-rs/argon2', 'pg', 'google-auth-library'],
+  serverExternalPackages: ['@node-rs/argon2', 'pg', 'google-auth-library', 'exceljs'],
   poweredByHeader: false,
   async headers() {
     return [

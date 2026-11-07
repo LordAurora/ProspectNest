@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Building2, ChevronLeft, ChevronRight, SearchX } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, FileSpreadsheet, SearchX } from 'lucide-react';
 import { z } from 'zod';
 import { LEAD_STATUSES, PRIORITIES, leadStatusLabel, priorityLabel } from '@prospectnest/core';
 import type { Prisma } from '@prospectnest/db';
@@ -128,7 +128,26 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <PageHeader title="İşletmeler" description="Kampanyalara eklenmiş işletmeler, bulguları ve öncelikleri." />
+      <PageHeader
+        title="İşletmeler"
+        description="Kampanyalara eklenmiş işletmeler, bulguları ve öncelikleri."
+        action={
+          filters.campaign ? (
+            <a
+              href={`/api/campaigns/${filters.campaign}/export?${new URLSearchParams({
+                format: 'xlsx',
+                ...(filters.priority ? { priority: filters.priority } : {}),
+                ...(filters.status ? { status: filters.status } : {}),
+              }).toString()}`}
+              className={buttonClass()}
+              download
+            >
+              <FileSpreadsheet aria-hidden />
+              Excel olarak indir
+            </a>
+          ) : null
+        }
+      />
 
       <Panel>
         <form className="flex flex-wrap items-center gap-2 border-b border-border p-3" role="search">

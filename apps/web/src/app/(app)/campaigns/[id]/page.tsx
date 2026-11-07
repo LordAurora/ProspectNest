@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowRight, Download, Upload } from 'lucide-react';
+import { ArrowRight, Download, FileSpreadsheet, Upload } from 'lucide-react';
 import { z } from 'zod';
 import {
   priorityLabel,
@@ -166,10 +166,16 @@ export default async function CampaignPage({ params }: Props) {
               ) : (
                 <p className="text-fg-muted">Google Sheets bağlı değil. Bağlantı için Entegrasyonlar sayfasına bakın.</p>
               )}
-              <a href={`/api/campaigns/${campaign.id}/export`} className={cn(buttonClass({ variant: 'ghost', size: 'sm' }), 'self-start')} download>
-                <Download aria-hidden />
-                CSV olarak indir
-              </a>
+              <div className="flex flex-wrap gap-2">
+                <a href={`/api/campaigns/${campaign.id}/export?format=xlsx`} className={buttonClass({ size: 'sm' })} download>
+                  <FileSpreadsheet aria-hidden />
+                  Excel olarak indir
+                </a>
+                <a href={`/api/campaigns/${campaign.id}/export`} className={buttonClass({ variant: 'ghost', size: 'sm' })} download>
+                  <Download aria-hidden />
+                  CSV
+                </a>
+              </div>
             </div>
           </Panel>
 
