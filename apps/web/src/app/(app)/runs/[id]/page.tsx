@@ -8,6 +8,7 @@ import { formatDateTime, formatNumber, formatRelative } from '@/lib/format';
 import { isActiveRun, runItemStatusTone, runStatusTone } from '@/lib/status';
 import { getWorkerState } from '@/lib/system';
 import { AutoRefresh, CancelRunButton, RetryRunButton } from '@/components/run-actions';
+import { DiscoveryResults } from '@/components/discovery-results';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader, Panel, PanelHeader } from '@/components/ui/panel';
 import { TD, TH, THead, TR, Table } from '@/components/ui/table';
@@ -31,8 +32,9 @@ const counterLabel: Record<string, string> = {
   invalid: 'Hatalı satır',
 };
 
-export default async function RunPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function RunPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ page?: string }> }) {
   const { id } = await params;
+  const resultPage = Math.max(1, Number((await searchParams).page) || 1);
   if (!z.uuid().safeParse(id).success) notFound();
 
   const [run, worker] = await Promise.all([
@@ -111,7 +113,9 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
             ['Tamamlanan', run.doneItems],
             ['Hatalı / engellenen', run.failedItems],
             ['Kalan', remaining],
-            ['Yeni / güncellenen işletme', `${formatNumber(run.newBusinesses)} / ${formatNumber(run.updatedBusinesses)}`],
+            run.kind === 'discovery'
+              ? ['Yeni / daha önce bulunan', `${formatNumber(run.newBusinesses)} / ${formatNumber(run.updatedBusinesses)}`]
+              : ['Yeni / güncellenen işletme', `${formatNumber(run.newBusinesses)} / ${formatNumber(run.updatedBusinesses)}`],
           ].map(([label, value]) => (
             <div key={String(label)} className="bg-surface px-4 py-3">
               <dt className="text-[12px] text-fg-muted">{label}</dt>
@@ -144,6 +148,12 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
             </ul>
           ) : null}
         </Panel>
+      ) : null}
+
+      {run.kind === 'discovery' ? (
+        <div className="mb-6">
+          <DiscoveryResults runId={run.id} active={active} page={resultPage} />
+        </div>
       ) : null}
 
       {items.length > 0 ? (

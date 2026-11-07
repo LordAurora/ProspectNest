@@ -14,10 +14,9 @@ import {
   type CampaignInput,
 } from '@prospectnest/core';
 import { importBusinesses, type ImportCounters, type ImportRowError } from '@prospectnest/db';
-import { resolveDiscoveryProvider } from '@prospectnest/providers';
 import { requireUser } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { env } from '@/lib/env';
+import { discoveryStatus } from '@/lib/system';
 
 export type FieldErrors = Record<string, string>;
 
@@ -36,7 +35,7 @@ export async function createCampaign(input: CampaignInput): Promise<{ errors: Fi
   if (!parsed.success) return { errors: toFieldErrors(parsed.error) };
 
   const data = parsed.data;
-  if (data.source === 'discovery' && resolveDiscoveryProvider(env().DISCOVERY_PROVIDER).status !== 'ready') {
+  if (data.source === 'discovery' && discoveryStatus().status !== 'ready') {
     return { errors: { source: 'Canlı keşif için önce bir keşif sağlayıcısı bağlanmalı.' } };
   }
 

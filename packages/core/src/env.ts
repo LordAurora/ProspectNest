@@ -23,6 +23,10 @@ export const serverEnvSchema = z.object({
   GOOGLE_SPREADSHEET_ID: optionalString,
   DISCOVERY_PROVIDER: z.string().default('none'),
   DISCOVERY_API_KEY: optionalString,
+  /** Google Places API (New) key for DISCOVERY_PROVIDER=google_places. Server-side only. */
+  GOOGLE_PLACES_API_KEY: optionalString,
+  /** Hard cap on billable Places requests per day across all campaigns. */
+  GOOGLE_PLACES_DAILY_REQUEST_LIMIT: z.coerce.number().int().min(1).max(100_000).default(100),
   WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
 });
 
@@ -52,6 +56,9 @@ export const workerEnvSchema = serverEnvSchema.pick({
   GOOGLE_APPLICATION_CREDENTIALS: true,
   OLLAMA_BASE_URL: true,
   OLLAMA_MODEL: true,
+  DISCOVERY_PROVIDER: true,
+  GOOGLE_PLACES_API_KEY: true,
+  GOOGLE_PLACES_DAILY_REQUEST_LIMIT: true,
 });
 
 export type WorkerEnv = z.infer<typeof workerEnvSchema>;

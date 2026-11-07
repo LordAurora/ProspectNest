@@ -6,3 +6,4 @@ export * from './sheets/sync';
 export * from './ollama/analysis';
 export * from './ollama/client';
 export * from './export/xlsx';
+export * from './places/client';

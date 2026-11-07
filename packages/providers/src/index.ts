@@ -1,5 +1,3 @@
-import type { BusinessInput } from '@prospectnest/core';
-
 /**
  * Documented policy of a data source. These are adapter facts taken from the
  * provider's terms, not switches a user can flip.
@@ -20,27 +18,30 @@ export type ProviderInfo = {
   capabilities: ProviderCapabilities;
 };
 
-export type DiscoveryQuery = {
-  countries: string[];
-  cities: string[];
-  categories: string[];
-  limit: number;
-};
-
-export type DiscoveryResult = {
-  externalId: string;
-  sourceUrl: string | null;
-  business: BusinessInput;
-};
-
-export interface DiscoveryProvider extends ProviderInfo {
-  discover(query: DiscoveryQuery, signal: AbortSignal): Promise<DiscoveryResult[]>;
-}
-
 export type DiscoveryStatus =
   | { status: 'not_configured'; reason: string }
   | { status: 'unsupported'; providerId: string; reason: string }
-  | { status: 'ready'; provider: DiscoveryProvider };
+  | { status: 'ready'; provider: ProviderInfo };
+
+/**
+ * Google Places API (New). Per the Google Maps Platform policies, place IDs
+ * may be stored indefinitely, but other Places content may not be cached,
+ * exported or copied to build a saved list. Discovery therefore keeps only
+ * place IDs; details are shown live with attribution and never exported.
+ */
+export const googlePlacesProvider: ProviderInfo = {
+  id: 'google_places',
+  name: 'Google Places',
+  capabilities: {
+    supportsDiscovery: true,
+    canPersist: false,
+    canExport: false,
+    canAnalyze: false,
+    attribution: 'Google Maps',
+    retentionPolicy: 'Yalnız place_id süresiz saklanır; ad, adres, telefon ve web sitesi saklanmaz, gösterim anında canlı alınır.',
+    rateLimitPolicy: 'Ücretli API; günlük istek sınırı GOOGLE_PLACES_DAILY_REQUEST_LIMIT ile uygulanır.',
+  },
+};
 
 /** User-owned or permitted files: the user is responsible for the source licence. */
 export const csvProvider: ProviderInfo = {
@@ -83,26 +84,23 @@ const importProviders: Record<string, ProviderInfo> = {
 export const getImportProvider = (id: string): ProviderInfo | undefined => importProviders[id];
 
 /**
- * No live discovery adapter ships yet. Choosing one requires verifying that its
- * terms allow search, storage and commercial export; until then discovery
- * reports `not_configured` and nothing synthetic is ever returned.
+ * Resolves the configured discovery source. A provider is "ready" only when
+ * its credentials are present; nothing synthetic is ever returned.
  */
-const discoveryAdapters: Record<string, () => DiscoveryProvider> = {};
-
-export function resolveDiscoveryProvider(configured: string): DiscoveryStatus {
+export function resolveDiscoveryProvider(configured: string, credentials: { googlePlacesApiKey?: string | undefined } = {}): DiscoveryStatus {
   if (!configured || configured === 'none') {
     return {
       status: 'not_configured',
-      reason: 'Canlı keşif için bağlantı gerekli. Arama ve saklamaya izin veren bir sağlayıcı seçilmedi.',
+      reason: 'Canlı keşif için bağlantı gerekli. Bir keşif sağlayıcısı yapılandırılmadı.',
     };
   }
-  const factory = discoveryAdapters[configured];
-  if (!factory) {
-    return {
-      status: 'unsupported',
-      providerId: configured,
-      reason: `"${configured}" için bir adaptör bulunmuyor.`,
-    };
+  if (configured === googlePlacesProvider.id) {
+    return credentials.googlePlacesApiKey
+      ? { status: 'ready', provider: googlePlacesProvider }
+      : {
+          status: 'not_configured',
+          reason: "GOOGLE_PLACES_API_KEY tanımlı değil. Google Cloud Console'da Places API (New) ve faturalandırma etkinleştirilmeli.",
+        };
   }
-  return { status: 'ready', provider: factory() };
+  return { status: 'unsupported', providerId: configured, reason: `"${configured}" için bir adaptör bulunmuyor.` };
 }

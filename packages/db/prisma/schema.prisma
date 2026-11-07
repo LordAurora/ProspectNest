@@ -171,6 +171,7 @@ model Campaign {
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
   businesses          CampaignBusiness[]
+  discoveredPlaces    DiscoveredPlace[]
   runs                Run[]
   sheetSync           SheetSync?
 }
@@ -333,6 +334,8 @@ model Run {
   failedItems       Int       @default(0)
   newBusinesses     Int       @default(0)
   updatedBusinesses Int       @default(0)
+  /// Billable external API calls made by this run (discovery quota).
+  apiRequests       Int       @default(0)
   error             String?
   cancelRequested   Boolean   @default(false)
   startedAt         DateTime?
@@ -482,4 +485,22 @@ model AIJobLease {
 
   @@index([campaignBusinessId, status])
   @@index([status, expiresAt])
+}
+
+/// Google Places discovery result. Only the place ID is stored: Google allows
+/// place IDs to be kept indefinitely, while names, addresses, phones and
+/// websites may not be cached or exported, so they are fetched live for display.
+model DiscoveredPlace {
+  id         String   @id @default(uuid()) @db.Uuid
+  campaignId String   @db.Uuid
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  runId      String   @db.Uuid
+  placeId    String
+  position   Int
+  createdAt  DateTime @default(now())
+
+  // One row per place per campaign: re-running a search never duplicates, and
+  // each branch has its own place ID so chains stay separate.
+  @@unique([campaignId, placeId])
+  @@index([runId, position])
 }

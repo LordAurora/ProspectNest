@@ -96,4 +96,5 @@ export const QUEUES = {
   maintenance: 'maintenance',
   sync: 'sync',
   ai: 'ai',
+  discovery: 'discovery',
 } as const;

@@ -13,9 +13,9 @@ import {
   PRIORITIES,
   nextRecheckWindow,
 } from '@prospectnest/core';
-import { resolveDiscoveryProvider } from '@prospectnest/providers';
 import { db } from '@/lib/db';
 import { env } from '@/lib/env';
+import { discoveryStatus } from '@/lib/system';
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { runStatusTone } from '@/lib/status';
@@ -23,6 +23,8 @@ import { Badge } from '@/components/ui/badge';
 import { buttonClass } from '@/components/ui/button';
 import { PageHeader, Panel, PanelHeader } from '@/components/ui/panel';
 import { SheetSyncButton } from '@/components/integration-actions';
+import { DiscoveryForm } from '@/components/discovery-form';
+import { PlacesTermsNote } from '@/components/places-terms-note';
 import { StartResearchButton } from '@/components/run-actions';
 import { ManualBusinessForm } from './manual-business-form';
 import { ScheduleForm } from './schedule-form';
@@ -64,7 +66,7 @@ export default async function CampaignPage({ params }: Props) {
   ]);
 
   const ruleSet = ruleSetSchema.safeParse(campaign.rules);
-  const discovery = resolveDiscoveryProvider(env().DISCOVERY_PROVIDER);
+  const discovery = discoveryStatus();
   const nextWindow = campaign.isDemo ? null : nextRecheckWindow(campaign, new Date());
   const sheetsConfigured = Boolean(env().GOOGLE_APPLICATION_CREDENTIALS && env().GOOGLE_SPREADSHEET_ID);
   const counts = Object.fromEntries(byPriority.map((row) => [row.priority, row._count]));
@@ -118,6 +120,41 @@ export default async function CampaignPage({ params }: Props) {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-6">
+          <Panel>
+            <PanelHeader
+              title="Google Maps'te işletme bul"
+              description="Google Places ile gerçek işletmeleri arar. Sonuçlar arka planda toplanır; sekmeyi kapatsanız da devam eder."
+            />
+            {discovery.status === 'ready' ? (
+              <>
+                <DiscoveryForm
+                  campaignId={campaign.id}
+                  country={campaign.countries[0] ?? 'TR'}
+                  cities={campaign.cities}
+                  categories={campaign.categories}
+                  disabled={Boolean(activeRun)}
+                />
+                <PlacesTermsNote />
+              </>
+            ) : (
+              <div className="flex flex-col gap-2 px-4 py-4 text-[13px]">
+                <p className="text-fg-muted">{discovery.reason}</p>
+                <details className="text-[12px] text-fg-muted">
+                  <summary className="cursor-pointer hover:text-fg">Kurulum</summary>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5">
+                    <li>Google Cloud Console&apos;da bir proje açın, faturalandırmayı ve &quot;Places API (New)&quot;i etkinleştirin. Bu ücretli bir hizmettir; uygulama sizin adınıza etkinleştirmez.</li>
+                    <li>Yalnız Places API (New) ile sınırlı bir API anahtarı oluşturun.</li>
+                    <li>
+                      Sunucu ortamına <code className="font-mono">DISCOVERY_PROVIDER=google_places</code> ve <code className="font-mono">GOOGLE_PLACES_API_KEY</code> ekleyin;
+                      isterseniz <code className="font-mono">GOOGLE_PLACES_DAILY_REQUEST_LIMIT</code> ile günlük sınırı değiştirin.
+                    </li>
+                  </ol>
+                </details>
+                <PlacesTermsNote />
+              </div>
+            )}
+          </Panel>
+
           <Panel>
             <PanelHeader title="İşletme ekle" description="Tek bir işletmeyi elle ekleyin. Mevcut kayıtlarla otomatik eşleştirilir." />
             <ManualBusinessForm campaignId={campaign.id} />

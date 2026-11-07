@@ -4,8 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { Prisma } from '@prospectnest/db';
+import { buildTextQuery, MAX_TEXT_SEARCH_RESULTS } from '@prospectnest/integrations';
 import { requireUser } from '@/lib/auth/session';
 import { db } from '@/lib/db';
+import { discoveryStatus } from '@/lib/system';
 
 export type RunActionState = { error?: string };
 
@@ -80,4 +82,35 @@ export async function retryRun(runId: string, _: RunActionState): Promise<RunAct
   const result = await enqueueResearch(run.campaignId, user.id, businessIds);
   if (typeof result !== 'string') return result;
   redirect(`/runs/${result}`);
+}
+
+const discoverySchema = z.object({
+  country: z.string().trim().max(60).optional(),
+  city: z.string().trim().min(1, 'Şehir girin').max(80),
+  district: z.string().trim().max(80).optional(),
+  category: z.string().trim().min(1, 'İşletme türü girin').max(80),
+  maxResults: z.coerce.number().int().min(1).max(MAX_TEXT_SEARCH_RESULTS),
+});
+
+/** Queues a Google Places search. The worker stores only place IDs. */
+export async function startDiscovery(campaignId: string, _: RunActionState, formData: FormData): Promise<RunActionState> {
+  const user = await requireUser();
+  const id = z.uuid().parse(campaignId);
+  if (discoveryStatus().status !== 'ready') return { error: 'Google Places yapılandırılmadı.' };
+  const parsed = discoverySchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Geçersiz arama.' };
+
+  const { country, city, district, category, maxResults } = parsed.data;
+  const regionCode = country && /^[a-z]{2}$/i.test(country) ? country.toUpperCase() : undefined;
+  const textQuery = buildTextQuery({ category, city, district: district ?? null, country: regionCode ? null : (country ?? null) });
+  try {
+    const run = await db().run.create({
+      data: { campaignId: id, kind: 'discovery', status: 'queued', options: { textQuery, maxResults, ...(regionCode ? { regionCode } : {}) } },
+    });
+    await db().auditEvent.create({ data: { action: 'discovery.queued', actorId: user.id, subject: run.id, metadata: { textQuery, maxResults } } });
+    redirect(`/runs/${run.id}`);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return { error: ACTIVE_CONFLICT };
+    throw error;
+  }
 }

@@ -22,7 +22,7 @@ export function startDispatcher(boss: PgBoss): () => void {
         UPDATE "Run" SET "dispatchedAt" = now()
         WHERE id IN (
           SELECT id FROM "Run"
-          WHERE status = 'queued' AND "dispatchedAt" IS NULL AND kind IN ('research', 'recheck', 'sync')
+          WHERE status = 'queued' AND "dispatchedAt" IS NULL AND kind IN ('research', 'recheck', 'sync', 'discovery')
           ORDER BY "createdAt"
           LIMIT 10
           FOR UPDATE SKIP LOCKED
@@ -30,7 +30,7 @@ export function startDispatcher(boss: PgBoss): () => void {
         RETURNING id, kind::text AS kind`;
       for (const { id, kind } of claimed) {
         try {
-          await boss.send(kind === 'sync' ? QUEUES.sync : QUEUES.research, { runId: id } satisfies ResearchJob, {
+          await boss.send(kind === 'sync' ? QUEUES.sync : kind === 'discovery' ? QUEUES.discovery : QUEUES.research, { runId: id } satisfies ResearchJob, {
             singletonKey: id,
             retryLimit: 3,
             retryDelay: 60,

@@ -1,6 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import { WORKER_HEARTBEAT_STALE_MS } from '@prospectnest/core';
+import { resolveDiscoveryProvider } from '@prospectnest/providers';
 import { db } from '@/lib/db';
 import { env } from '@/lib/env';
 import { formatRelative } from '@/lib/format';
@@ -53,6 +54,11 @@ export const getIntegrationSummaries = cache(async (): Promise<IntegrationSummar
     e.AI_MODE === 'agent'
       ? await db().agentCredential.findFirst({ where: { revokedAt: null }, orderBy: { lastUsedAt: { sort: 'desc', nulls: 'last' } }, select: { lastUsedAt: true } })
       : null;
+  const discovery = discoveryStatus();
+  const lastDiscovery =
+    discovery.status === 'ready'
+      ? await db().run.findFirst({ where: { kind: 'discovery', status: { in: ['completed', 'failed'] } }, orderBy: { createdAt: 'desc' }, select: { status: true, finishedAt: true, error: true } })
+      : null;
   const ollamaEnabled = e.AI_MODE === 'local' && Boolean(e.OLLAMA_MODEL);
   const ollamaRow = ollamaEnabled ? await db().integration.findUnique({ where: { kind: 'ollama' } }) : null;
   const ollamaState: IntegrationSummary['state'] =
@@ -83,11 +89,14 @@ export const getIntegrationSummaries = cache(async (): Promise<IntegrationSummar
     {
       key: 'discovery',
       name: 'Keşif sağlayıcısı',
-      state: e.DISCOVERY_PROVIDER === 'none' ? 'not_configured' : 'configured',
+      state: discovery.status === 'ready' ? (lastDiscovery?.status === 'completed' ? 'healthy' : lastDiscovery?.status === 'failed' ? 'error' : 'configured') : 'not_configured',
+      lastSuccessAt: lastDiscovery?.status === 'completed' ? lastDiscovery.finishedAt : null,
       detail:
-        e.DISCOVERY_PROVIDER === 'none'
-          ? 'Canlı keşif için bağlantı gerekli. İşletmeler CSV veya manuel olarak eklenir.'
-          : `Sağlayıcı: ${e.DISCOVERY_PROVIDER}. Adaptör henüz doğrulanmadı.`,
+        discovery.status !== 'ready'
+          ? `${discovery.reason} İşletmeler CSV veya manuel olarak eklenebilir.`
+          : lastDiscovery?.status === 'failed'
+            ? (lastDiscovery.error ?? 'Son arama başarısız oldu.')
+            : `${discovery.provider.name}: yalnız place_id saklanır; ayrıntılar gösterim anında canlı alınır ve dışa aktarılmaz. Günlük istek sınırı ${e.GOOGLE_PLACES_DAILY_REQUEST_LIMIT}.`,
     },
     {
       key: 'ollama',
@@ -111,3 +120,9 @@ export const getIntegrationSummaries = cache(async (): Promise<IntegrationSummar
     },
   ];
 });
+
+/** Discovery source with its credentials checked; "ready" only when the key is present. */
+export const discoveryStatus = () => {
+  const e = env();
+  return resolveDiscoveryProvider(e.DISCOVERY_PROVIDER, { googlePlacesApiKey: e.GOOGLE_PLACES_API_KEY });
+};

@@ -2,10 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { PgBoss } from 'pg-boss';
 import { QUEUES, workerEnvSchema } from '@prospectnest/core';
 import { evaluateCampaignBusiness, getDb } from '@prospectnest/db';
-import { createGoogleSheetsApi, OllamaClient } from '@prospectnest/integrations';
+import { createGoogleSheetsApi, OllamaClient, PlacesClient } from '@prospectnest/integrations';
 import { startDispatcher, type ResearchJob } from './dispatcher';
 import { startHeartbeat } from './heartbeat';
 import { processAnalysis, type AiJob } from './jobs/ai';
+import { processDiscoveryRun } from './jobs/discovery';
 import { PURGE_SESSIONS_JOB, purgeExpiredSessions } from './jobs/maintenance';
 import { processResearchRun } from './jobs/research';
 import { planScheduledRuns, SCHEDULER_JOB } from './jobs/scheduler';
@@ -25,6 +26,7 @@ async function main() {
   await boss.createQueue(QUEUES.research);
   await boss.createQueue(QUEUES.sync);
   await boss.createQueue(QUEUES.ai);
+  await boss.createQueue(QUEUES.discovery);
 
   // Local AI is optional: with AI_MODE=disabled no analysis is queued and the
   // rest of the pipeline is unaffected. One analysis at a time keeps CPU-only machines usable.
@@ -78,6 +80,20 @@ async function main() {
       return;
     }
     await processSyncRun(job.data.runId, createGoogleSheetsApi(credentials));
+  });
+
+  // Google Places discovery: only when explicitly configured with a key.
+  const places = env.DISCOVERY_PROVIDER === 'google_places' && env.GOOGLE_PLACES_API_KEY ? new PlacesClient(env.GOOGLE_PLACES_API_KEY) : null;
+  await boss.work<ResearchJob>(QUEUES.discovery, { batchSize: 1 }, async ([job]) => {
+    if (!job) return;
+    if (!places) {
+      await getDb().run.update({
+        where: { id: job.data.runId },
+        data: { status: 'failed', error: 'Google Places yapılandırılmadı (DISCOVERY_PROVIDER ve GOOGLE_PLACES_API_KEY).', finishedAt: new Date() },
+      });
+      return;
+    }
+    await processDiscoveryRun(job.data.runId, places, env.GOOGLE_PLACES_DAILY_REQUEST_LIMIT);
   });
 
   const stopDispatcher = startDispatcher(boss);
