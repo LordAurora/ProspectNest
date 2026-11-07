@@ -19,6 +19,13 @@ export const siteFixtures: Record<string, FixtureResponse> = {
   // Working digital menu on a third-party host.
   'https://simitkosesi.example/': { html: read('simit-home.html') },
   'https://simitkosesi.qrmenu.example/menu': { html: '<html><body><h1>Menü</h1></body></html>' },
+  // Image menu plus a WhatsApp menu request on the contact page.
+  'https://egesofrasi.example/': { html: read('egesofrasi-home.html') },
+  'https://egesofrasi.example/menu': { html: read('egesofrasi-menu.html') },
+  'https://egesofrasi.example/iletisim': { html: read('egesofrasi-contact.html') },
+  // Working QR menu on a third-party host.
+  'https://kizilaydoner.example/': { html: read('kizilay-home.html') },
+  'https://kizilaydoner.qrmenu.example/': { html: '<html><body><h1>Menü</h1></body></html>' },
   // Menu requested by phone/WhatsApp.
   'https://bademli.example/': { html: read('bademli-home.html') },
   // Reachable site without evidence; contains an instruction aimed at a model.

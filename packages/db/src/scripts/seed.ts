@@ -5,7 +5,7 @@
  */
 import path from 'node:path';
 import { config } from 'dotenv';
-import { defaultRuleSet, normalizeDomain, normalizeName } from '@prospectnest/core';
+import { defaultRuleSet, normalizeDomain, normalizeName, normalizePhone } from '@prospectnest/core';
 import { getDb } from '../client';
 import type { ObservationStatus } from '../generated/prisma/client';
 import { evaluateCampaignBusiness } from '../services/scoring';
@@ -204,7 +204,7 @@ async function main() {
 
       const contacts = [
         item.email ? { kind: 'email' as const, value: item.email } : null,
-        item.phone ? { kind: 'phone' as const, value: item.phone } : null,
+        item.phone ? { kind: 'phone' as const, value: normalizePhone(item.phone) ?? item.phone } : null,
       ].filter((c) => c !== null);
       if (contacts.length > 0) {
         await tx.contact.createMany({

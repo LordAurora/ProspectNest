@@ -68,7 +68,14 @@ export function extractPage(html: string, pageUrl: string): PageExtraction {
   const $ = cheerio.load(html);
   const rawHtml = html.slice(0, 200_000);
   $('script, style, noscript, template, iframe').remove();
-  const text = $('body').text().replace(/\s+/g, ' ').trim();
+  // Block elements end a line, so an excerpt never glues a heading onto the next paragraph.
+  $('h1, h2, h3, h4, h5, h6, p, li, div, section, article, header, footer, nav, td, br').after('\n');
+  const blockText = $('body')
+    .text()
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
+    .trim();
+  const text = blockText.replace(/\s+/g, ' ');
   const pageHost = hostOf(pageUrl);
 
   const signals: PageSignal[] = [];
@@ -123,11 +130,11 @@ export function extractPage(html: string, pageUrl: string): PageExtraction {
   });
 
   if ($('form').filter((_, f) => RESERVATION_TEXT.test($(f).text())).length > 0) add('reservation_widget', 'Rezervasyon formu');
-  const cartMatch = CART_TEXT.exec(text);
+  const cartMatch = CART_TEXT.exec(blockText);
   if (cartMatch) add('ecommerce_cart', cartMatch[0]);
   else if (/cdn\.shopify\.com|woocommerce-cart|wc-add-to-cart/i.test(rawHtml)) add('ecommerce_cart', 'Online mağaza altyapısı');
 
-  const phoneRequest = PHONE_MENU_REQUEST.exec(text);
+  const phoneRequest = PHONE_MENU_REQUEST.exec(blockText);
   if (phoneRequest) add('menu_by_phone_request', phoneRequest[0]);
 
   for (const match of text.matchAll(EMAIL_PATTERN)) {

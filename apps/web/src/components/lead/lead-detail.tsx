@@ -136,7 +136,13 @@ export function LeadDetail({ lead }: { lead: LeadDetailData }) {
   const timeline = [
     ...business.sources.map((s) => ({ at: s.firstSeenAt, text: `${s.provider === 'csv' ? 'CSV' : s.provider === 'manual' ? 'Manuel kayıt' : s.provider === 'demo' ? 'Demo verisi' : s.provider} ile eklendi` })),
     ...lead.runItems.map((item) => ({ at: item.updatedAt, text: `Araştırma: ${runItemStatusLabel[item.status]}${item.error ? ` — ${item.error}` : ''}`, tone: runItemStatusTone[item.status], href: `/runs/${item.runId}` })),
-    ...lead.evaluations.map((e) => ({ at: e.createdAt, text: `Puan ${e.score} · ${priorityLabel[e.priority]} (kural sürümü ${e.ruleVersion})` })),
+    // Only score or priority changes are events; re-scoring with the same outcome is not.
+    ...lead.evaluations
+      .filter((e, i, all) => {
+        const older = all[i + 1];
+        return !older || older.score !== e.score || older.priority !== e.priority || older.ruleVersion !== e.ruleVersion;
+      })
+      .map((e) => ({ at: e.createdAt, text: `Puan ${e.score} · ${priorityLabel[e.priority]} (kural sürümü ${e.ruleVersion})` })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
   return (

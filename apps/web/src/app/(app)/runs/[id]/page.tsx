@@ -115,7 +115,9 @@ export default async function RunPage({ params, searchParams }: { params: Promis
             ['Kalan', remaining],
             run.kind === 'discovery'
               ? ['Yeni / daha önce bulunan', `${formatNumber(run.newBusinesses)} / ${formatNumber(run.updatedBusinesses)}`]
-              : ['Yeni / güncellenen işletme', `${formatNumber(run.newBusinesses)} / ${formatNumber(run.updatedBusinesses)}`],
+              : run.kind === 'import'
+                ? ['Yeni / güncellenen işletme', `${formatNumber(run.newBusinesses)} / ${formatNumber(run.updatedBusinesses)}`]
+                : ['İncelenen sayfa', formatNumber(run.items.reduce((sum, item) => sum + item.pagesFetched, 0))],
           ].map(([label, value]) => (
             <div key={String(label)} className="bg-surface px-4 py-3">
               <dt className="text-[12px] text-fg-muted">{label}</dt>
