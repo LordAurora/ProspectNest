@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 async function loadOverview() {
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [campaignCount, newLeads, researched, pendingRuns, lastSuccess, recentRuns, topLeads, partialRuns] =
+  const [campaignCount, newLeads, researched, pendingRuns, lastSuccess, recentRuns, topLeads, partialRuns, duplicates] =
     await Promise.all([
       db().campaign.count({ where: { archivedAt: null } }),
       db().campaignBusiness.count({ where: { firstSeenAt: { gte: since } } }),
@@ -52,8 +52,9 @@ async function loadOverview() {
         },
       }),
       db().run.count({ where: { status: { in: ['partial', 'failed'] } } }),
+      db().business.count({ where: { duplicateOfId: { not: null } } }),
     ]);
-  return { campaignCount, newLeads, researched, pendingRuns, lastSuccess, recentRuns, topLeads, partialRuns };
+  return { campaignCount, newLeads, researched, pendingRuns, lastSuccess, recentRuns, topLeads, partialRuns, duplicates };
 }
 
 export default async function OverviewPage() {
@@ -88,6 +89,9 @@ export default async function OverviewPage() {
       text: `${formatNumber(data.partialRuns)} çalışma kısmi veya başarısız bitti.`,
       href: '/runs',
     });
+  }
+  if (data.duplicates > 0) {
+    attention.push({ tone: 'warning', text: `${formatNumber(data.duplicates)} olası eşleşme inceleme bekliyor.`, href: '/businesses/duplicates' });
   }
   for (const integration of integrations) {
     if (integration.state === 'error') {

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Building2, ChevronLeft, ChevronRight, FileSpreadsheet, SearchX } from 'lucide-react';
+import { Building2, ChevronLeft, ChevronRight, CopyCheck, FileSpreadsheet, SearchX } from 'lucide-react';
 import { z } from 'zod';
 import { LEAD_STATUSES, PRIORITIES, leadStatusLabel, priorityLabel } from '@prospectnest/core';
 import type { Prisma } from '@prospectnest/db';
@@ -71,7 +71,7 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
   const where = buildWhere(filters);
   const hasFilters = FILTER_KEYS.some((key) => key !== 'campaign' && filters[key]) || Boolean(filters.campaign);
 
-  const [total, leads, campaigns, cities, viewed] = await Promise.all([
+  const [total, leads, campaigns, cities, viewed, duplicateCount] = await Promise.all([
     db().campaignBusiness.count({ where }),
     db().campaignBusiness.findMany({
       where,
@@ -102,6 +102,7 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
     db().campaign.findMany({ where: { archivedAt: null }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
     db().business.findMany({ where: { city: { not: null } }, distinct: ['city'], select: { city: true }, orderBy: { city: 'asc' } }),
     filters.view ? loadLead(filters.view) : null,
+    db().business.count({ where: { duplicateOfId: { not: null } } }),
   ]);
 
   const rows: BusinessRow[] = leads.map(({ business, ...lead }) => ({
@@ -132,20 +133,29 @@ export default async function BusinessesPage({ searchParams }: { searchParams: P
         title="İşletmeler"
         description="Kampanyalara eklenmiş işletmeler, bulguları ve öncelikleri."
         action={
-          filters.campaign ? (
-            <a
-              href={`/api/campaigns/${filters.campaign}/export?${new URLSearchParams({
-                format: 'xlsx',
-                ...(filters.priority ? { priority: filters.priority } : {}),
-                ...(filters.status ? { status: filters.status } : {}),
-              }).toString()}`}
-              className={buttonClass()}
-              download
-            >
-              <FileSpreadsheet aria-hidden />
-              Excel olarak indir
-            </a>
-          ) : null
+          <>
+            {duplicateCount > 0 ? (
+              <Link href="/businesses/duplicates" className={buttonClass({ variant: 'ghost' })}>
+                <CopyCheck aria-hidden />
+                Olası eşleşmeler
+                <span className="rounded-[5px] bg-warning-soft px-1.5 text-[12px] text-warning tabular-nums">{duplicateCount}</span>
+              </Link>
+            ) : null}
+            {filters.campaign ? (
+              <a
+                href={`/api/campaigns/${filters.campaign}/export?${new URLSearchParams({
+                  format: 'xlsx',
+                  ...(filters.priority ? { priority: filters.priority } : {}),
+                  ...(filters.status ? { status: filters.status } : {}),
+                }).toString()}`}
+                className={buttonClass()}
+                download
+              >
+                <FileSpreadsheet aria-hidden />
+                Excel olarak indir
+              </a>
+            ) : null}
+          </>
         }
       />
 
