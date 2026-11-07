@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { PageHeader, Panel, PanelHeader } from '@/components/ui/panel';
 import { logout } from '@/app/login/actions';
 import { AgentTokens } from './agent-tokens';
+import { PasswordForm } from './password-form';
 
 export const metadata: Metadata = { title: 'Ayarlar' };
 export const dynamic = 'force-dynamic';
@@ -30,12 +31,15 @@ export default async function SettingsPage() {
           <dl className="grid gap-x-6 gap-y-3 px-4 py-4 text-[14px] sm:grid-cols-[160px_1fr]">
             <dt className="text-fg-muted">E-posta</dt>
             <dd className="text-fg">{user.email}</dd>
-            <dt className="text-fg-muted">Parola</dt>
-            <dd className="text-fg">
-              Parolayı sunucuda <code className="font-mono text-[13px]">pnpm admin:create</code> ile değiştirin. Değişiklik
-              tüm oturumları kapatır.
-            </dd>
           </dl>
+        </Panel>
+
+        <Panel>
+          <PanelHeader
+            title="Parola"
+            description="Değişiklik bu oturum dışındaki tüm oturumları kapatır. Parolayı unutursanız sunucuda pnpm admin:create ile sıfırlayabilirsiniz."
+          />
+          <PasswordForm />
         </Panel>
 
         <Panel>

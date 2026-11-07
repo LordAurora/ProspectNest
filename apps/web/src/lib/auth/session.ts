@@ -68,6 +68,14 @@ export async function requireUser(): Promise<SessionUser> {
   return user;
 }
 
+/** Id of the session making this request, so it can survive a password change. */
+export async function currentSessionId(): Promise<string | null> {
+  const token = (await cookies()).get(sessionCookieName())?.value;
+  if (!token) return null;
+  const session = await db().session.findUnique({ where: { tokenHash: hashToken(token) }, select: { id: true } });
+  return session?.id ?? null;
+}
+
 export async function destroySession(): Promise<void> {
   const store = await cookies();
   const token = store.get(sessionCookieName())?.value;
